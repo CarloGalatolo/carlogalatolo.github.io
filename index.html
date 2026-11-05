@@ -17,13 +17,12 @@
 	--fuoco:#f03317; --acqua:#0b3be6; --vento:#17c666; --terra:#966430; --luce:#ffd560; --oscurita:#7b46ad;
 	--cell:min(16.4vw, 92px);
 
-	/* tempi delle animazioni */
-	/* Questi tempi li legge anche la sequenza di animazione in JavaScript (cssMs): ogni animazione parte quando la sequenza la avvia, non ci sono ritardi in CSS. */
-	--lead:.25s;	/* durata del drop (il primo affondo parte insieme a lui) e anticipo con cui compare la selezione dei bersagli rispetto alla fine dell'ultima rotazione */
-	--spin-time:.5s;	/* rotazione della carta catturata */
-	--atk-time:.4s;	/* affondo dell'attacco: l'impatto è a metà, da lì parte la rotazione; il passo successivo parte quando la rotazione è finita */
-	--reach:calc(var(--cell) * .15);	/* di quanto si sposta la carta che colpisce */
-	--boost-time:.5s;	/* aumento dell'ATK per vantaggio di Attributo: precede l'affondo e ritarda di altrettanto il resto della catena */
+	/** Variabili delle animazioni **/
+	--lead:.25s;	/* Durata del drop e anticipo con cui si collegano le animazioni */
+	--spin-time:.5s;	/* Rotazione della carta catturata */
+	--atk-time:.4s;	/* Durata dell'affondo */
+	--reach:calc(var(--cell) * .15);	/* Spostamento dell'affondo */
+	--boost-time:.5s;	/* Durata aumento dell'ATK per vantaggio di Attributo */
 	--boost-hold:calc(var(--boost-time) + var(--atk-time));	/* il valore potenziato resta visibile fino alla fine dell'affondo */
 }
 @media (prefers-color-scheme:dark){
@@ -160,6 +159,8 @@ input[type=text]{text-transform:uppercase;letter-spacing:.15em;width:8.5em;font-
 .insp dd{margin:0}
 .rules{font-size:.92rem}
 .menu-rules{margin-top:16px}
+.resume{margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--cellbg)}
+.resume .row{margin-top:8px}
 .rules summary{font-family:'Chakra Petch',sans-serif;font-weight:600;cursor:pointer}
 .rules ul{padding-left:1.1em;margin:8px 0}
 .attrmap{display:block;width:100%;max-width:440px;height:auto;margin:6px 0}
@@ -217,6 +218,7 @@ input[type=text]{text-transform:uppercase;letter-spacing:.15em;width:8.5em;font-
         <div class="row"><input type="text" id="joinCode" maxlength="5" placeholder="CODICE" aria-label="Codice della stanza" autocomplete="off"><button class="btn" id="btnJoin" disabled>Entra</button></div>
         <div class="note" id="onlineNote">Controllo della connessione…</div>
         <div class="err" id="menuErr" hidden></div>
+        <div class="note resume" id="resumeBox" hidden></div>
       </section>
     </div>
     <div class="box rules menu-rules" id="rulesMenu"></div>
@@ -668,6 +670,7 @@ function render(){
   const logHidden = present ? Math.max(0, (st.logCount||0) - present.lc) : 0;	// righe dei lanci non ancora mostrati
   $('log').innerHTML = (st.log||[]).slice(logHidden).map(l=>`<li>${esc(l)}</li>`).join('');
   renderTools();
+  saveRoom();
 }
 function renderHand(el, seat, isTop){
   const st = state;
@@ -822,6 +825,8 @@ document.addEventListener('click', e=>{
   if(t.id==='btnJoin') return joinRoom();
   if(t.id==='btnExit') return exitToMenu();
   if(t.id==='btnReconnect') return reconnect();
+  if(t.id==='btnResume') return resumeRoom();
+  if(t.id==='btnForget') return forgetRoom();
   if(t.id==='btnResignal'){ if(online.peer) hostKeepSignal(online.peer); return; }
   if(t.id==='btnRotate'){ if(isBusy()) return; localView = 1-localView; return render(); }
   if(t.id==='btnFace'){ if(isBusy()) return; faceMode = !faceMode; return render(); }
@@ -873,7 +878,7 @@ function exitToMenu(){
   destroyPeer();
   cancelPresent(); cancelFx(); setupSeq = -1; animSeq = -1;	// la prossima partita riparte da seq basso: le animazioni non vanno considerate già viste
   mode = null; state = null; mySeat = null; selHand = null;
-  $('menu').hidden = false; $('game').hidden = true; $('btnExit').hidden = true;
+  $('menu').hidden = false; $('game').hidden = true; $('btnExit').hidden = true; showResume();
   try{ history.replaceState(null, '', location.pathname + location.search); }catch{}
 }
 
@@ -938,7 +943,7 @@ function linkLost(c, forceClose){
 }
 function scheduleGuestReconnect(n=0){	// l'ospite riprova da solo, con pause crescenti, finché non è di nuovo collegato
   clearTimeout(online.retry);
-  if(online.host || mode!=='online' || connected() || n>=15) return;
+  if(online.host || mode!=='online' || connected() || n>=60) return;
   online.retry = setTimeout(()=>{
     if(online.host || mode!=='online' || connected()) return;
     reconnect(); scheduleGuestReconnect(n+1);
@@ -955,7 +960,7 @@ function hostKeepSignal(peer, n=0){	// ricollega l'host al server finché non ci
   try{ peer.reconnect(); }catch{}
   setTimeout(()=>{ if(online.peer===peer && !peer.destroyed && peer.disconnected) hostKeepSignal(peer, n+1); }, Math.min(1500 + n*1500, 10000));
 }
-function createRoom(tries=0, resume=null){
+function createRoom(tries=0, resume=null, restore=null){
   menuError('');
   if(typeof Peer==='undefined') return;
   $('btnCreate').disabled = true;
@@ -969,7 +974,14 @@ function createRoom(tries=0, resume=null){
     // 'open' scatta anche quando il collegamento col server si ristabilisce dopo una caduta: la stanza (e l'eventuale partita) restano quelle, non si ricreano
     if(mode==='online' && state && state.code===code){ flash = ''; render(); return; }
     mode = 'online'; mySeat = 0;
-    state = {v:1, seq:1, code, status:'lobby', players:{s0:{id:online.myId, deck:$('od').value}, s1:null}, log:[]};
+    if(restore){	// stanza ripresa dal salvataggio (vedi resumeRoom): stesso stato di prima, l'ospite si ricollega da solo
+      state = structuredClone(restore); state.fx = null; state.sfx = null; state.seq = (state.seq||0) + 1;
+      if(!state.players || !state.players.s0 || state.players.s0.id!==online.myId){ state.players = state.players || {}; state.players.s0 = {id:online.myId, deck:(state.players.s0 && state.players.s0.deck) || $('od').value}; }
+      mySeat = seatFromState() ?? 0;
+      $('onlineNote').textContent = ONLINE_NOTE;
+    } else {
+      state = {v:1, seq:1, code, status:'lobby', players:{s0:{id:online.myId, deck:$('od').value}, s1:null}, log:[]};
+    }
     attach(code);
   });
   peer.on('connection', c=>hostAccept(c));
@@ -982,7 +994,11 @@ function createRoom(tries=0, resume=null){
   peer.on('error', err=>{
     if(online.peer!==peer) return;
     if(err.type==='unavailable-id'){
-      if(resume){ setTimeout(()=>{ if(online.peer===peer && mode==='online') createRoom(0, code); }, 3000); return; }	// il server non ha ancora liberato il vecchio id
+      if(resume && (mode==='online' || tries<10)){	// il server non ha ancora liberato il vecchio id (succede subito dopo aver chiuso la pagina): riprova per qualche secondo
+        if(mode!=='online') $('onlineNote').textContent = 'Riprendo la stanza: il server la sta ancora liberando, riprovo…';
+        setTimeout(()=>{ if(online.peer===peer && (mode==='online' || restore)) createRoom(tries+1, code, restore); }, 3000);
+        return;
+      }
       if(tries<4) return createRoom(tries+1);
     }
     $('btnCreate').disabled = false;
@@ -1000,13 +1016,16 @@ function hostAccept(c){
       const id = String(msg.id||'').slice(0,40);
       const deck = DECKS[msg.deck] ? msg.deck : 'tramonto';
       const P = state.players;
-      // il posto dell'ospite è occupato solo se la partita è iniziata, o se un altro ospite è davvero collegato: in sala d'attesa un posto "abbandonato" si può riprendere
+      // il posto dell'ospite è occupato solo se quell'ospite è davvero collegato: se se n'è andato (anche a partita iniziata, per esempio perché ha
+      // chiuso la scheda e ha perso il suo id) chi conosce il codice può riprenderlo
       const otherHere = !!(online.conn && online.conn!==c && online.conn.open && online.peersOnline);
-      if(P.s1 && P.s1.id!==id && (state.status!=='lobby' || otherHere)){ c.send({type:'full'}); setTimeout(()=>c.close(), 300); return; }
+      if(P.s1 && P.s1.id!==id && otherHere){ c.send({type:'full'}); setTimeout(()=>c.close(), 300); return; }
       const old = online.conn; online.conn = c; online.peersOnline = true; flash = ''; noteSeen();
       if(old && old!==c){ try{ old.close(); }catch{} }	// (online.conn è già il nuovo: la chiusura del vecchio non conta come caduta)
       if(!state.players.s1 || state.players.s1.id!==id){
-        const st = structuredClone(state); st.players.s1 = {id, deck}; st.seq = (state.seq||0)+1; state = st;
+        const st = structuredClone(state);
+        st.players.s1 = {id, deck: (state.status==='lobby' || !state.players.s1) ? deck : state.players.s1.deck};	// a partita iniziata i mazzi non cambiano
+        st.seq = (state.seq||0)+1; state = st;
       }
       c.send({type:'state', state});
       render();
@@ -1050,6 +1069,8 @@ function joinRoom(){
   $('btnJoin').disabled = true;
   destroyPeer();
   online.host = false; online.code = code; online.deck = $('od').value; online.joinTry = 0;
+  const g = loadSaved(GUEST_KEY);	// stesso id dell'ultima volta in questa stanza: si riprende il proprio posto anche da una scheda nuova
+  if(g && g.code===code && g.id){ online.myId = g.id; try{ sessionStorage.setItem('linkgrid-id', g.id); }catch{} }
   $('onlineNote').textContent = 'Mi collego alla stanza…';
   const peer = new Peer();
   online.peer = peer;
@@ -1101,7 +1122,7 @@ function guestConnect(){
       if(first){ mode = 'online'; state = null; }
       flash = '';
       applyRemote(msg.state);
-      if(first) attach(online.code);
+      if(first){ storeSaved(GUEST_KEY, {code:online.code, id:online.myId}); attach(online.code); }
       else render();
     }
   });
@@ -1125,6 +1146,35 @@ function reconnect(){
     peer.on('error', err=>{ if(online.peer===peer){ flash = peerErrorText(err); render(); scheduleGuestReconnect(); } });
     state = keepState;
   }
+}
+// ===== riprendere la stanza dopo aver chiuso o ricaricato la pagina =====
+const ROOM_KEY = 'linkgrid-room', GUEST_KEY = 'linkgrid-guest', ROOM_TTL = 24*3600*1000;
+function loadSaved(key){ try{ const v = JSON.parse(localStorage.getItem(key)); return v && Date.now() - (v.at||0) < ROOM_TTL ? v : null; }catch{ return null; } }
+function storeSaved(key, v){ try{ localStorage.setItem(key, JSON.stringify(Object.assign({at:Date.now()}, v))); }catch{} }
+let savedSeq = -1;
+function saveRoom(){	// l'host salva la stanza a ogni cambiamento di stato (la tiene solo lui): così può riprenderla anche dopo una chiusura o un ricaricamento
+  if(mode!=='online' || !online.host || !state || !state.code || (state.seq||0)===savedSeq) return;
+  savedSeq = state.seq||0;
+  const copy = Object.assign({}, state); delete copy.fx; delete copy.sfx;
+  storeSaved(ROOM_KEY, {code:state.code, hostId:online.myId, state:copy});
+}
+function showResume(){
+  const box = $('resumeBox'); if(!box) return;
+  const r = loadSaved(ROOM_KEY);
+  if(!r || !r.state || !r.code){ box.hidden = true; box.innerHTML = ''; return; }
+  const what = r.state.status==='lobby' ? 'in sala d’attesa' : r.state.status==='over' ? 'partita finita' : 'partita in corso';
+  box.hidden = false;
+  box.innerHTML = `<div>Hai lasciato la stanza <b>${esc(r.code)}</b> (${what}). Riprendila: l’altro giocatore, se è ancora collegato, rientra da solo.</div>`+
+    `<div class="row"><button class="btn primary" id="btnResume">Riprendi la stanza</button><button class="btn" id="btnForget">Dimentica</button></div>`;
+}
+function forgetRoom(){ try{ localStorage.removeItem(ROOM_KEY); }catch{} savedSeq = -1; showResume(); }
+function resumeRoom(){
+  const r = loadSaved(ROOM_KEY);
+  if(!r || !r.state){ showResume(); return; }
+  if(typeof Peer==='undefined') return;
+  online.myId = r.hostId; try{ sessionStorage.setItem('linkgrid-id', r.hostId); }catch{}	// stesso id di prima: il posto 1 della stanza è ancora il suo
+  savedSeq = -1;
+  createRoom(0, r.code, r.state);
 }
 function attach(code){
   selHand = null; inspected = null; flash = '';
@@ -1218,6 +1268,7 @@ $('rulesGame').innerHTML = RULES_HTML;
 const hm = /^#stanza-([A-Za-z0-9]{5})$/.exec(location.hash);
 if(hm) $('joinCode').value = hm[1].toUpperCase();
 initOnline();
+showResume();
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) netWake(); });
 window.addEventListener('online', netWake);
 </script>
