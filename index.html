@@ -289,6 +289,10 @@ const BONUS = 500;
 function d6(){ return 1 + Math.floor(Math.random()*6); }
 function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 function pName(s){ return 'Giocatore ' + (s+1); }
+// Il registro è condiviso tra i due giocatori, ma ognuno deve leggerlo dal proprio punto di vista ("Tu vinci" / "L'avversario vince"): il motore scrive
+// segnaposto e fmtMsg() li traduce al momento di mostrarli. {pN} = giocatore N come soggetto, {paN} = "a" + giocatore N, {vN:terza|seconda} = verbo
+// coniugato per il giocatore N (terza persona, oppure seconda se è "tu").
+const tp = n => `{p${n}}`, tpa = n => `{pa${n}}`, tv = (n, third, second) => `{v${n}:${third}|${second}}`;
 function addLog(st, msg){ st.log.unshift(msg); if(st.log.length>60) st.log.length=60; st.logCount = (st.logCount||0) + 1; }	// logCount: righe scritte in totale (l'animazione dei dadi lo usa per tenere nascosto il registro "in anticipo")
 function vecs(k, ctrl){ const m = ctrl===0 ? 1 : -1; return CARDS[k].ar.map(d=>[DIRV[d][0]*m, DIRV[d][1]*m]); }
 function colToC(st,k){ return st.first===0 ? k-1 : 5-k; }
@@ -302,7 +306,7 @@ function newGame(deckSel){
   for(const s of [0,1]){ st.piles[s] = shuffle(DECKS[deckSel[s]].cards.slice()); st.hands[s] = st.piles[s].splice(0,5); }
   let a,b; do { a=d6(); b=d6(); st.firstRolls.push([a,b]); } while(a===b);
   st.first = a>b ? 0 : 1;
-  addLog(st, `${pName(st.first)} vince il lancio iniziale (${a} contro ${b}) e gioca per primo.`);
+  addLog(st, `${tp(st.first)} ${tv(st.first,'vince','vinci')} il lancio iniziale (${a} contro ${b}) e ${tv(st.first,'gioca','giochi')} per primo.`);
   st.sfx = {lc0:st.logCount, events:[]};	// registro dei lanci di preparazione (vedi advanceSetup), per l'animazione
   advanceSetup(st);
   return st;
@@ -325,12 +329,12 @@ function advanceSetup(st){
       blockCell(st, r, c, cd, rd); ev.res='block'; ev.cell=r*5+c; ev.lc=st.logCount; continue;
     }
     const second = 1-st.first;
-    if(cd===6 && rd!==6){ S.pending = {stage:'col', chooser:st.first, row:rd}; addLog(st, `Il dado della colonna fa 6: ${pName(st.first)} sceglie la colonna (riga ${rd}).`); }
-    else if(rd===6 && cd!==6){ S.pending = {stage:'row', chooser:second, col:cd}; addLog(st, `Il dado della riga fa 6: ${pName(second)} sceglie la riga (colonna ${cd}).`); }
-    else { S.pending = {stage:'col', chooser:st.first, row:null}; addLog(st, `Doppio 6: ${pName(st.first)} sceglie prima la colonna.`); }
+    if(cd===6 && rd!==6){ S.pending = {stage:'col', chooser:st.first, row:rd}; addLog(st, `Il dado della colonna fa 6: ${tp(st.first)} ${tv(st.first,'sceglie','scegli')} la colonna (riga ${rd}).`); }
+    else if(rd===6 && cd!==6){ S.pending = {stage:'row', chooser:second, col:cd}; addLog(st, `Il dado della riga fa 6: ${tp(second)} ${tv(second,'sceglie','scegli')} la riga (colonna ${cd}).`); }
+    else { S.pending = {stage:'col', chooser:st.first, row:null}; addLog(st, `Doppio 6: ${tp(st.first)} ${tv(st.first,'sceglie','scegli')} prima la colonna.`); }
     ev.lc = st.logCount;
   }
-  if(S.n >= 5){ S.pending = null; st.status = 'play'; st.turn = st.first; addLog(st, `Campo pronto. Inizia ${pName(st.first)}.`); }
+  if(S.n >= 5){ S.pending = null; st.status = 'play'; st.turn = st.first; addLog(st, `Campo pronto. ${tv(st.first,'Inizia','Inizi')} ${tp(st.first)}.`); }
 }
 function setupOptions(st){
   const p = st.setup.pending; if(!p) return [];
@@ -350,7 +354,7 @@ function chooseSetup(st, k){
   const p = st.setup.pending; if(!p || !setupOptions(st)[k-1]) return false;
   st.sfx = {lc0:st.logCount||0, events:[]};	// nuovo gruppo di eventi da animare (la casella scelta e gli eventuali lanci successivi)
   if(p.stage==='col'){
-    if(p.row==null){ st.setup.pending = {stage:'row', chooser:1-st.first, col:k}; addLog(st, `${pName(st.first)} sceglie la colonna ${k}. Ora ${pName(1-st.first)} sceglie la riga.`); return true; }
+    if(p.row==null){ st.setup.pending = {stage:'row', chooser:1-st.first, col:k}; addLog(st, `${tp(st.first)} ${tv(st.first,'sceglie','scegli')} la colonna ${k}. Ora ${tp(1-st.first)} ${tv(1-st.first,'sceglie','scegli')} la riga.`); return true; }
     const r = rowToR(st,p.row), c = colToC(st,k);
     blockCell(st, r, c, k, p.row); st.sfx.events.push({kind:'pick', cell:r*5+c, lc:st.logCount});
   } else {
@@ -375,7 +379,7 @@ function Place(st, hi, i) {
 	const k = st.hands[s].splice(hi,1)[0];
 	st.board[i] = {k, o:s, c:s};
 	st.fx = {placed:i, drop:true, attacks:[], battles:[]};
-	addLog(st, `${pName(s)} gioca ${CARDS[k].n}.`);
+	addLog(st, `${tp(s)} ${tv(s,'gioca','giochi')} ${CARDS[k].n}.`);
 	runCapture(st, i); return true;
 }
 
@@ -415,7 +419,7 @@ function ResolveAttack(st, a, t){
 	if(bonus) at.boost = {from:CARDS[A.k].a, to:av};	// vantaggio di Attributo: per l'animazione, l'ATK dell'attaccante sale prima dello scontro
 	const atkTxt = bonus ? `${CARDS[A.k].a}+${bonus}` : `${av}`;
 	if(av>dv){ D.c = s; at.flip = t.i; at.to = s; addLog(st, `Battaglia: ${an} (${atkTxt}) batte ${dn} (${dv}). Catturato.`); return t.i; }
-	if(av<dv){ A.c = 1-s; at.flip = a; at.to = 1-s; addLog(st, `Battaglia: ${an} (${atkTxt}) perde contro ${dn} (${dv}) e passa a ${pName(1-s)}.`); return -1; }
+	if(av<dv){ A.c = 1-s; at.flip = a; at.to = 1-s; addLog(st, `Battaglia: ${an} (${atkTxt}) perde contro ${dn} (${dv}) e passa ${tpa(1-s)}.`); return -1; }
 	addLog(st, `Battaglia: ${an} e ${dn} pareggiano (${dv}). Nessuna cattura.`); return -1;
 }
 
@@ -425,12 +429,12 @@ function endTurn(st){
   if(!st.board.some(x=>x===null)){
     const sc = score(st); const w = sc[0]>sc[1] ? 0 : sc[1]>sc[0] ? 1 : st.first;
     st.status = 'over'; st.result = {score:sc, winner:w, tie: sc[0]===sc[1]};
-    addLog(st, sc[0]===sc[1] ? `Pareggio ${sc[0]} a ${sc[1]}: vince ${pName(w)}, che ha giocato per primo.` : `Fine partita: vince ${pName(w)}, ${Math.max(...sc)} a ${Math.min(...sc)}.`);
+    addLog(st, sc[0]===sc[1] ? `Pareggio ${sc[0]} a ${sc[1]}: ${tv(w,'vince','vinci')} ${tp(w)}, ${tv(w,'che ha','che hai')} giocato per primo.` : `Fine partita: ${tv(w,'vince','vinci')} ${tp(w)}, ${Math.max(...sc)} a ${Math.min(...sc)}.`);
     return;
   }
   st.turn = 1-s;
   const n = st.turn;
-  if(!st.hands[n].length && st.piles[n].length){ st.hands[n] = st.piles[n].splice(0,5); addLog(st, `${pName(n)} ha finito la mano e pesca 5 carte.`); }
+  if(!st.hands[n].length && st.piles[n].length){ st.hands[n] = st.piles[n].splice(0,5); addLog(st, `${tp(n)} ${tv(n,'ha finito','hai finito')} la mano e ${tv(n,'pesca','peschi')} 5 carte.`); }
 }
 // ENGINE END
 // ---------- UI ----------
@@ -478,6 +482,22 @@ function viewSeat(){ return mode==='online' ? (mySeat ?? 0) : localView; }
 function seatName(s){
   if(mode==='online'){ if(mySeat===null) return pName(s); return s===mySeat ? 'Tu' : 'Avversario'; }
   return pName(s);
+}
+// Come si chiama un giocatore nei messaggi: in online "tu" / "l’avversario" (cap = a inizio frase), altrimenti "Giocatore N" (locale, spettatori)
+function who(s, cap){
+  if(mode!=='online' || mySeat===null) return pName(s);
+  return s===mySeat ? (cap ? 'Tu' : 'tu') : (cap ? 'L’avversario' : 'l’avversario');
+}
+// Traduce i segnaposto del registro (vedi tp/tpa/tv nel motore) per chi guarda; i messaggi senza segnaposto (vecchie partite salvate) restano com'erano
+function fmtMsg(m){
+  const on = mode==='online' && mySeat!==null;
+  return String(m).replace(/\{(pa|p|v)([01])(?::([^}|]*)\|([^}]*))?\}/g, (all, kind, n, third, second, off)=>{
+    n = +n; const me = on && n===mySeat;
+    if(kind==='v') return me ? second : third;
+    if(kind==='pa') return !on ? 'a ' + pName(n) : me ? 'a te' : 'all’avversario';
+    const start = off===0 || /[.!?]\s$/.test(String(m).slice(0, off));
+    return who(n, start);
+  });
 }
 function canAct(seat){ return !present && (mode==='local' || mySeat===seat); }
 // Vero mentre i dadi di preparazione girano o la sequenza di animazione di una mossa è in corso: i click su carte e caselle vengono ignorati.
@@ -655,7 +675,7 @@ function render(){
     const sc = scoreView(st)[s];
     const turn = st.status==='play' && st.turn===s;
     el.style.setProperty('--pc', `var(--p${s})`);
-    el.innerHTML = `<span class="who ${turn?'turn':''}">${esc(seatName(s))}${mode==='online'&&mySeat!==null?` <span class="count">(${pName(s)})</span>`:''}</span>`+
+    el.innerHTML = `<span class="who ${turn?'turn':''}">${esc(seatName(s))}</span>`+
       `<span class="count">${DECKS[deckOf(s)].name}, mazzo ${st.piles[s].length}</span>`+
       `<span class="count">Controllati <span class="big">${sc}</span></span>`;
   }
@@ -668,7 +688,7 @@ function render(){
   renderExtra();
   renderInspector();
   const logHidden = present ? Math.max(0, (st.logCount||0) - present.lc) : 0;	// righe dei lanci non ancora mostrati
-  $('log').innerHTML = (st.log||[]).slice(logHidden).map(l=>`<li>${esc(l)}</li>`).join('');
+  $('log').innerHTML = (st.log||[]).slice(logHidden).map(l=>`<li>${esc(fmtMsg(l))}</li>`).join('');
   renderTools();
   saveRoom();
 }
@@ -745,8 +765,8 @@ function renderStatus(){
     else { main = 'Turno dell’avversario'; sub = online.peersOnline ? '' : 'L’avversario non è connesso in questo momento.'; }
   } else if(st.status==='over'){
     const r = st.result; box.classList.add('overlay'); box.style.setProperty('--pc', `var(--p${r.winner})`);
-    const who = mode==='online' && mySeat!==null ? (r.winner===mySeat ? 'Hai vinto' : 'Hai perso') : `Vince ${pName(r.winner)}`;
-    main = `<span class="big">${who}</span>`;
+    const esito = mode==='online' && mySeat!==null ? (r.winner===mySeat ? 'Hai vinto' : 'Hai perso') : `Vince ${pName(r.winner)}`;
+    main = `<span class="big">${esito}</span>`;
     sub = `${r.score[0]} a ${r.score[1]}${r.tie ? ', pareggio risolto a favore di chi ha giocato per primo' : ''}.`;
   }
   el.innerHTML = `${main}${sub?`<small>${esc(sub)}</small>`:''}${flash?`<small class="err">${esc(flash)}</small>`:''}`;
@@ -760,13 +780,13 @@ function renderExtra(){
   const S = st.setup, fr = st.firstRolls[st.firstRolls.length-1];
   const shown = S.n - (present ? present.hidden.size : 0);	// spazi bloccati finora mostrati
   let h = `<h3>Preparazione</h3>`;
-  h += `<div class="note">Lancio iniziale: <b style="color:var(--p0)">${pName(0)} ${DIE[fr[0]]} ${fr[0]}</b>, <b style="color:var(--p1)">${pName(1)} ${DIE[fr[1]]} ${fr[1]}</b>. Gioca per primo ${esc(seatName(st.first))}${mode==='online'&&mySeat!==null?` (${pName(st.first)})`:''}.</div>`;
+  h += `<div class="note">Lancio iniziale: <b style="color:var(--p0)">${esc(seatName(0))} ${DIE[fr[0]]} ${fr[0]}</b>, <b style="color:var(--p1)">${esc(seatName(1))} ${DIE[fr[1]]} ${fr[1]}</b>. Gioca per primo ${esc(who(st.first))}.</div>`;
   h += `<div class="note">Spazi bloccati: ${shown} di 5.</div>`;
   // dadi: il dado della colonna è del primo giocatore, quello della riga del secondo (ognuno col colore del suo giocatore)
   const dd = present && present.face ? present.face : S.last, rl = present ? present.rolling : [false,false];
   if(dd) h += `<div class="dice">`+
-    `<span class="die ${rl[0]?'rolling':''}" style="--dc:var(--p${st.first})"><b id="dieC">${DIE[dd[0]]}</b>colonna<small>${pName(st.first)}</small></span>`+
-    `<span class="die ${rl[1]?'rolling':''}" style="--dc:var(--p${1-st.first})"><b id="dieR">${DIE[dd[1]]}</b>riga<small>${pName(1-st.first)}</small></span></div>`;
+    `<span class="die ${rl[0]?'rolling':''}" style="--dc:var(--p${st.first})"><b id="dieC">${DIE[dd[0]]}</b>colonna<small>${esc(seatName(st.first))}</small></span>`+
+    `<span class="die ${rl[1]?'rolling':''}" style="--dc:var(--p${1-st.first})"><b id="dieR">${DIE[dd[1]]}</b>riga<small>${esc(seatName(1-st.first))}</small></span></div>`;
   const p = present ? null : S.pending;	// la scelta compare solo a dadi fermi
   if(p){
     const what = p.stage==='col' ? 'la colonna' : 'la riga';
@@ -774,7 +794,7 @@ function renderExtra(){
     if(canAct(p.chooser)){	// la scelta si fa sul campo: qui solo l'istruzione
       const where = p.stage==='col' && p.row==null ? 'una delle colonne evidenziate' : 'una delle caselle evidenziate';
       h += `<div>${esc(mode==='local'?pName(p.chooser)+', scegli':'Scegli')} ${what}${fixed}: tocca ${where} nel campo.</div>`;
-    } else h += `<div class="note">In attesa che ${mode==='online'&&mySeat!==null?'l’avversario':esc(pName(p.chooser))} scelga ${what}${fixed}.</div>`;
+    } else h += `<div class="note">In attesa che ${esc(who(p.chooser))} scelga ${what}${fixed}.</div>`;
   }
   box.innerHTML = h;
 }
@@ -785,7 +805,7 @@ function lobbyHTML(){
   for(const s of [0,1]){
     const p = P['s'+s];
     const mine = mySeat===s;
-    h += `<div class="row"><span style="min-width:7.5em">${pName(s)}${mine?' (tu)':''}</span>`;
+    h += `<div class="row"><span style="min-width:7.5em">${esc(seatName(s))}</span>`;
     if(!p) h += `<span class="note">libero</span>`;
     else if(mine) h += `<select data-deck-seat="${s}" aria-label="Il tuo mazzo">${deckOptions(p.deck)}</select>`;
     else h += `<span>${DECKS[p.deck]?.name||'?'}${mySeat===0 && s===1 && !online.peersOnline ? ' <span class="note">(non connesso)</span>' : ''}</span>`;
@@ -793,7 +813,7 @@ function lobbyHTML(){
   }
   if(mySeat===0 && online.signal===false) h += `<p class="err">Il collegamento con il server che mette in contatto i giocatori è caduto: l’altro giocatore non può trovare la stanza. Sto riprovando a ricollegarmi…</p>`;
   if(mySeat===0) h += `<button class="btn primary" id="btnStart" ${P.s1&&online.peersOnline?'':'disabled'}>Inizia la partita</button>`;
-  else if(mySeat===1) h += `<p class="note">La partita parte quando ${pName(0)} la avvia.</p>`;
+  else if(mySeat===1) h += `<p class="note">La partita parte quando ${esc(who(0))} la avvia.</p>`;
   else h += `<p class="note">Stai guardando come spettatore: la stanza è già piena.</p>`;
   return h;
 }
@@ -812,7 +832,7 @@ function renderTools(){
   if(st.status==='over'){
     if(mode==='local') h += `<button class="btn primary" id="btnAgain">Gioca ancora</button>`;
     else if(mySeat===0) h += `<button class="btn primary" id="btnAgain">Nuova partita</button>`;
-    else if(mySeat===1) h += `<span class="note">${pName(0)} può avviare una nuova partita.</span>`;
+    else if(mySeat===1) h += `<span class="note">${esc(who(0, true))} può avviare una nuova partita.</span>`;
   }
   el.innerHTML = h;
 }
