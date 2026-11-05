@@ -10,31 +10,23 @@
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-	box-sizing:border-box;
-	padding-top:env(safe-area-inset-top,0px);
-	padding-bottom:env(safe-area-inset-bottom,0px);
+	color-scheme:light;
+	box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
 	--bg:#e7ebf3; --surface:#f8fafd; --raised:#ffffff; --ink:#16203a; --muted:#56627d; --line:#c3cce0; --cellbg:#d8dfec;
 	--p0:#b5620a; --p1:#2c53cc; --off:rgba(22,32,58,.14); --focus:#0a74e6; --danger:#b42318;
-	--fuoco:#f03317;
-	--acqua:#0b3be6;
-	--vento:#17c666;
-	--terra:#966430;
-	--luce:#ffd560;
-	--oscurita:#7b46ad;
+	--fuoco:#f03317; --acqua:#0b3be6; --vento:#17c666; --terra:#966430; --luce:#ffd560; --oscurita:#7b46ad;
 	--cell:min(16.4vw, 92px);
-	color-scheme:light;
 }
 @media (prefers-color-scheme:dark){
 :root:not([data-theme="light"]){
+	color-scheme:dark;
 	--bg:#0d1322; --surface:#172038; --raised:#1d2843; --ink:#e7ecf6; --muted:#9aa6c0; --line:#2c3858; --cellbg:#111a2e;
 	--p0:#f2a541; --p1:#83a0ff; --off:rgba(231,236,246,.15); --focus:#59a8ff; --danger:#ff7b6b;
-	color-scheme:dark;
-}
-}
+}}
 :root[data-theme="dark"]{
+	color-scheme:dark;
 	--bg:#0d1322; --surface:#172038; --raised:#1d2843; --ink:#e7ecf6; --muted:#9aa6c0; --line:#2c3858; --cellbg:#111a2e;
 	--p0:#f2a541; --p1:#83a0ff; --off:rgba(231,236,246,.15); --focus:#59a8ff; --danger:#ff7b6b;
-	color-scheme:dark;
 }
 *,*::before,*::after{box-sizing:inherit}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
@@ -79,7 +71,7 @@ input[type=text]{text-transform:uppercase;letter-spacing:.15em;width:8.5em;font-
 .pinfo .big{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:1.3rem;color:var(--ink)}
 .hand{display:flex;gap:5px;min-height:var(--cell)}
 .slot{width:var(--cell);height:var(--cell);border-radius:10px;border:1px dashed var(--line)}
-.hcard{padding:0;border:0;background:none;border-radius:10px;transition:transform .15s}
+.hcard{padding:0;border:0;background:none;border-radius:10px}
 .hcard.sel{transform:translateY(-8px)}
 .hand.bottom .hcard.sel{transform:translateY(-8px)}
 .hand.topside .hcard.sel{transform:translateY(8px)}
@@ -90,40 +82,57 @@ input[type=text]{text-transform:uppercase;letter-spacing:.15em;width:8.5em;font-
 .cell.blocked{border-style:solid;background:repeating-linear-gradient(45deg,var(--line) 0 3px,var(--cellbg) 3px 10px);cursor:default}
 .cell.open{border:2px solid var(--focus);background:color-mix(in srgb,var(--focus) 10%,var(--cellbg))}
 .cell.has{border:0;background:none}
-.cell.target .card{box-shadow:0 0 0 3px var(--focus),0 0 18px color-mix(in srgb,var(--focus) 60%,transparent);animation:pulse 1s ease-in-out infinite alternate}
+.cell.target .card{box-shadow:0 0 0 3px var(--focus),0 0 18px color-mix(in srgb,var(--focus) 60%,transparent)}
 .cell.attacker .card{box-shadow:0 0 0 3px var(--ink)}
 .cell.last .card{outline:2px dotted var(--ink);outline-offset:2px}
-@keyframes pulse{to{transform:rotate(var(--r,0deg)) scale(1.05)}}
 /* card */
 .card{position:relative;width:var(--cell);height:var(--cell);border-radius:10px;background:var(--raised);border:2px solid var(--line);container-type:inline-size;overflow:hidden;color:var(--ink);text-align:center;display:block}
-.card.c0{border-color:var(--p0);background:color-mix(in srgb,var(--p0) 14%,var(--raised))}
-.card.c1{border-color:var(--p1);background:color-mix(in srgb,var(--p1) 14%,var(--raised))}
+.card.c0{--pc:var(--p0);--pc-old:var(--p1)}	/* --pc = colore del controllore attuale; --pc-old = quello del precedente (una carta catturata cambia sempre lato) */
+.card.c1{--pc:var(--p1);--pc-old:var(--p0)}
+.card.c0,.card.c1{border-color:var(--pc);background:color-mix(in srgb,var(--pc) 14%,var(--raised))}
 .card svg{position:absolute;inset:0;width:100%;height:100%}
 .card svg.rot{transform:rotate(180deg)}
 .card.turned{--r:180deg;transform:rotate(180deg)}
 .pinfo.turned{transform:rotate(180deg)}
 .card polygon{fill:var(--off)}
-.card.c0 polygon.on{fill:var(--p0)}
-.card.c1 polygon.on{fill:var(--p1)}
+.card.c0 polygon.on,.card.c1 polygon.on{fill:var(--pc)}
 .card.cn polygon.on{fill:var(--ink)}
 .cbody{position:absolute;inset:12% 11%;display:flex;flex-direction:column;justify-content:space-between;align-items:stretch}
 .cname{font-size:10.5cqw;line-height:1.08;font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
 .catk{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:24cqw;line-height:1}
 .cmeta{display:flex;justify-content:space-between;align-items:center;font-family:'Chakra Petch',sans-serif;font-weight:600;font-size:10cqw}
 .adot{display:inline-block;width:11cqw;height:11cqw;border-radius:50%;background:var(--ac)}
-/* cattura: la carta ruota di 180° nel piano del tavolo (come una carta vera), con un leggero sollevamento */
-/* La rotazione usa la proprietà `rotate` (componibile con transform) con soli due keyframe: un'unica curva continua, senza pause a metà.
-   --d = verso: 1 antiorario (carta passata al Giocatore 1), -1 orario (passata al Giocatore 2). */
-.card.spin{--d:1;animation:spin .65s ease-in-out,lift .65s ease-in-out;z-index:2}
+/* ===== Animazioni ===== */
+.hcard{transition:transform .15s}	/* carta in mano: sollevamento quando è selezionata */
+.cell.target .card{animation:pulse 1s ease-in-out infinite alternate}	/* bersagli selezionabili */
+:root{	/* tempi delle animazioni */
+	--lead:.25s;	/* anticipo: durata del drop, e di quanto ogni passo della catena parte prima che finisca l'animazione precedente */
+	--spin-time:.5s;	/* rotazione della carta catturata */
+	--atk-time:.4s;	/* affondo dell'attacco */
+	--hit:calc(var(--atk-time) * .5);	/* istante dell'impatto, a metà affondo: da lì parte la rotazione */
+	--stride:calc(var(--hit) + var(--spin-time) - var(--lead));	/* distanza tra l'inizio di un attacco e quello del successivo nella combo */
+	--reach:calc(var(--cell) * .15);	/* di quanto si sposta la carta che colpisce */
+	--boost-time:.5s;	/* aumento dell'ATK per vantaggio di Attributo: precede l'affondo e ritarda di altrettanto il resto della catena */
+	--boost-hold:calc(var(--boost-time) + var(--atk-time));	/* il valore potenziato resta visibile fino alla fine dell'affondo */
+}
+@property --atk-n{syntax:'<integer>';inherits:false;initial-value:0}	/* contatore animabile del valore ATK */
+.card.drop{animation:drop var(--lead) ease-out}	/* carta appena piazzata */
+/* affondo sulla cella (non sulla carta, così non confligge con la rotazione). --lxN/--lyN direzione, --mN passo della combo; slot 2 = seconda volta che la stessa carta colpisce */
+.cell.lunge,.cell.lunge2{z-index:3}
+.cell.lunge{--ld1:calc(var(--m1) * var(--stride) + var(--b1) * var(--boost-time));animation:lunge1 var(--atk-time) linear var(--ld1)}
+.cell.lunge2{--ld2:calc(var(--m2) * var(--stride) + var(--b2) * var(--boost-time));animation:lunge2 var(--atk-time) linear var(--ld2)}
+.cell.lunge.lunge2{animation:lunge1 var(--atk-time) linear var(--ld1),lunge2 var(--atk-time) linear var(--ld2)}
+/* aumento ATK per vantaggio di Attributo: il numero conta da --atk-from a --atk-to (contatore @property + counter(), perché il testo non si anima da solo),
+   si ingrandisce e si colora, resta così fino alla fine dell'affondo e poi torna al valore base. Parte (--bk-esimo passo) dopo le pause precedenti (--bb-1). */
+.catk.boost{--atk-n:var(--atk-from);--boost-delay:calc(var(--bk) * var(--stride) + (var(--bb) - 1) * var(--boost-time));counter-reset:atk var(--atk-n);color:transparent;position:relative;
+	animation:atkhold var(--boost-hold) linear var(--boost-delay),atkcount var(--boost-time) ease-out var(--boost-delay)}
+.catk.boost::after{content:counter(atk);position:absolute;inset:0;color:var(--ink);
+	animation:boosthold var(--boost-hold) linear var(--boost-delay),boostpop var(--boost-time) ease-in-out var(--boost-delay)}
+.card.spin{--d:1;--n:0;--b:0;--spin-delay:calc(var(--n) * var(--stride) + var(--hit) + var(--b) * var(--boost-time));animation:spin var(--spin-time) ease-in-out var(--spin-delay) backwards,lift var(--spin-time) ease-in-out var(--spin-delay) backwards,recolor var(--spin-time) steps(1,jump-start) var(--spin-delay) backwards;z-index:2}	/* cattura --d = verso: 1 antiorario (carta passata al Giocatore 1), -1 orario (passata al Giocatore 2). --n = posizione nella catena di combo (impostata da render()): ogni carta parte con anticipo --lead rispetto alla fine della precedente (la prima rispetto alla fine del drop: parte con lui, quindi --lead prima della sua fine). "backwards" = durante l'attesa la carta mostra l'orientamento di partenza */
 .card.spin.p1{--d:-1}
-@keyframes spin{from{rotate:calc(180deg * var(--d))}to{rotate:0deg}}
-@keyframes lift{50%{scale:1.12}}
-/* nel modo normale il testo resta sempre dritto: contro-rotazione del corpo carta */
-.card.spin:not(.turned) .cbody{animation:unspin .65s ease-in-out}
-@keyframes unspin{from{rotate:calc(-180deg * var(--d))}to{rotate:0deg}}
-.card.drop{animation:drop .25s ease-out}
-@keyframes drop{from{transform:rotate(var(--r,0deg)) scale(1.15);opacity:.4}to{transform:rotate(var(--r,0deg)) scale(1);opacity:1}}
-@media (prefers-reduced-motion:reduce){.card.spin,.card.spin .cbody,.card.drop,.cell.target .card{animation:none}.hcard{transition:none}}
+.card.spin:not(.face) .cbody{animation:unspin var(--spin-time) ease-in-out var(--spin-delay) backwards}	/* nel modo normale il testo resta sempre dritto: contro-rotazione del corpo carta; in modalità "carte verso chi le controlla" (.face) il testo ruota con la carta */
+
+@media (prefers-reduced-motion:reduce){.card.spin,.card.spin .cbody,.card.drop,.cell.target .card,.cell.lunge,.cell.lunge2,.catk.boost,.catk.boost::after{animation:none}.hcard{transition:none}}
 /* panel */
 .panel{display:flex;flex-direction:column;gap:14px}
 .box{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
@@ -153,6 +162,28 @@ input[type=text]{text-transform:uppercase;letter-spacing:.15em;width:8.5em;font-
 .overlay{border:2px solid var(--pc);background:color-mix(in srgb,var(--pc) 10%,var(--surface))}
 .overlay .big{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:1.5rem}
 [hidden]{display:none!important}
+
+/* ===== Keyframes Animazioni ===== */
+@keyframes pulse{to{transform:rotate(var(--r,0deg)) scale(1.05)}}
+@keyframes drop{from{transform:rotate(var(--r,0deg)) scale(1.15);opacity:.4}to{transform:rotate(var(--r,0deg)) scale(1);opacity:1}}
+@keyframes spin{from{rotate:calc(180deg * var(--d))}to{rotate:0deg}}
+@keyframes lift{50%{scale:1.12}}
+/* aumento ATK: conteggio, poi valore potenziato mantenuto (atkcount è dopo atkhold nell'elenco delle animazioni, quindi durante il conteggio vince lui) */
+@keyframes atkcount{from{--atk-n:var(--atk-from)}to{--atk-n:var(--atk-to)}}
+@keyframes atkhold{from,to{--atk-n:var(--atk-to)}}
+@keyframes boostpop{0%{scale:1;color:var(--ink)}55%{scale:1.5;color:var(--focus)}100%{scale:1.15;color:var(--focus)}}
+@keyframes boosthold{from,to{color:var(--focus);scale:1.15}}
+/* affondo: la carta si solleva e scatta verso il bersaglio (ease-in: accelera fino all'impatto a metà), poi torna al suo posto (ease-out) */
+@keyframes lunge1{
+	0%{translate:0 0;scale:1;animation-timing-function:ease-in}
+	50%{translate:calc(var(--lx1) * var(--reach)) calc(var(--ly1) * var(--reach));scale:1.12;animation-timing-function:ease-out}
+	100%{translate:0 0;scale:1}}
+@keyframes lunge2{
+	0%{translate:0 0;scale:1;animation-timing-function:ease-in}
+	50%{translate:calc(var(--lx2) * var(--reach)) calc(var(--ly2) * var(--reach));scale:1.12;animation-timing-function:ease-out}
+	100%{translate:0 0;scale:1}}
+@keyframes unspin{from{rotate:calc(-180deg * var(--d))}to{rotate:0deg}}
+@keyframes recolor{from{--pc:var(--pc-old)}}	/* il colore (bordo, sfondo, frecce) resta quello vecchio durante l'attesa e passa al nuovo di scatto alla partenza della rotazione */
 </style>
 </head>
 <body>
@@ -331,21 +362,23 @@ function targetsOf(st, i){
   }
   return out;
 }
-function place(st, hi, i){
-  const s = st.turn;
-  if(st.status!=='play' || st.pending || st.board[i] || hi<0 || hi>=st.hands[s].length) return false;
-  const k = st.hands[s].splice(hi,1)[0];
-  st.board[i] = {k, o:s, c:s};
-  st.fx = {placed:i, flips:[], battles:[]};
-  addLog(st, `${pName(s)} gioca ${CARDS[k].n}.`);
-  runCapture(st, i); return true;
+
+function Place(st, hi, i) {
+	const s = st.turn;
+	if(st.status!=='play' || st.pending || st.board[i] || hi<0 || hi>=st.hands[s].length) return false;
+	const k = st.hands[s].splice(hi,1)[0];
+	st.board[i] = {k, o:s, c:s};
+	st.fx = {placed:i, drop:true, attacks:[], battles:[]};
+	addLog(st, `${pName(s)} gioca ${CARDS[k].n}.`);
+	runCapture(st, i); return true;
 }
+
 function runCapture(st, a){
   for(let g=0; g<50; g++){
     const t = targetsOf(st, a);
     if(!t.length) return endTurn(st);
     if(t.length>1){ st.pending = {a, t:t.map(x=>x.i)}; return; }
-    a = resolveAttack(st, a, t[0]);
+    a = ResolveAttack(st, a, t[0]);
     if(a<0) return endTurn(st);
   }
   endTurn(st);
@@ -354,24 +387,31 @@ function chooseTarget(st, ti){
   const p = st.pending; if(!p) return false;
   const t = targetsOf(st, p.a).find(x=>x.i===ti); if(!t) return false;
   st.pending = null;
-  if(!st.fx) st.fx = {placed:null, flips:[], battles:[]};
-  const n = resolveAttack(st, p.a, t);
+  // nuova tranche di animazioni: gli attacchi già mostrati prima della scelta non devono ripetersi (né il drop)
+  st.fx = {placed: st.fx ? st.fx.placed : null, drop:false, attacks:[], battles:[]};
+  const n = ResolveAttack(st, p.a, t);
   if(n<0) endTurn(st); else runCapture(st, n);
   return true;
 }
-function resolveAttack(st, a, t){
-  const A = st.board[a], D = st.board[t.i], s = st.turn;
-  const an = CARDS[A.k].n, dn = CARDS[D.k].n;
-  const back = vecs(D.k, D.c).some(v=>v[0]===-t.dr && v[1]===-t.dc);
-  if(!back){ D.c = s; st.fx.flips.push(t.i); addLog(st, `${an} punta ${dn}, che non può rispondere: catturato.`); return t.i; }
-  const bonus = BEATS[CARDS[A.k].at]===CARDS[D.k].at ? BONUS : 0;
-  const av = CARDS[A.k].a + bonus, dv = CARDS[D.k].a;
-  st.fx.battles.push({a, d:t.i, av, dv, bonus});
-  const atkTxt = bonus ? `${CARDS[A.k].a}+${bonus}` : `${av}`;
-  if(av>dv){ D.c = s; st.fx.flips.push(t.i); addLog(st, `Battaglia: ${an} (${atkTxt}) batte ${dn} (${dv}). Catturato.`); return t.i; }
-  if(av<dv){ A.c = 1-s; st.fx.flips.push(a); addLog(st, `Battaglia: ${an} (${atkTxt}) perde contro ${dn} (${dv}) e passa a ${pName(1-s)}.`); return -1; }
-  addLog(st, `Battaglia: ${an} e ${dn} pareggiano (${dv}). Nessuna cattura.`); return -1;
+
+function ResolveAttack(st, a, t){
+	const A = st.board[a], D = st.board[t.i], s = st.turn;
+	const an = CARDS[A.k].n, dn = CARDS[D.k].n;
+	const back = vecs(D.k, D.c).some(v=>v[0]===-t.dr && v[1]===-t.dc);
+	// attacco per l'animazione: clash = il difensore risponde (scontro); flip = carta che cambia controllore (null se pareggio)
+	const at = {a, d:t.i, clash:back, flip:null};
+	st.fx.attacks.push(at);
+	if(!back){ D.c = s; at.flip = t.i; addLog(st, `${an} punta ${dn}, che non può rispondere: catturato.`); return t.i; }
+	const bonus = BEATS[CARDS[A.k].at]===CARDS[D.k].at ? BONUS : 0;
+	const av = CARDS[A.k].a + bonus, dv = CARDS[D.k].a;
+	st.fx.battles.push({a, d:t.i, av, dv, bonus});
+	if(bonus) at.boost = {from:CARDS[A.k].a, to:av};	// vantaggio di Attributo: per l'animazione, l'ATK dell'attaccante sale prima dello scontro
+	const atkTxt = bonus ? `${CARDS[A.k].a}+${bonus}` : `${av}`;
+	if(av>dv){ D.c = s; at.flip = t.i; addLog(st, `Battaglia: ${an} (${atkTxt}) batte ${dn} (${dv}). Catturato.`); return t.i; }
+	if(av<dv){ A.c = 1-s; at.flip = a; addLog(st, `Battaglia: ${an} (${atkTxt}) perde contro ${dn} (${dv}) e passa a ${pName(1-s)}.`); return -1; }
+	addLog(st, `Battaglia: ${an} e ${dn} pareggiano (${dv}). Nessuna cattura.`); return -1;
 }
+
 function score(st){ const sc=[0,0]; for(const x of st.board) if(x && x.k) sc[x.c]++; return sc; }
 function endTurn(st){
   st.pending = null; const s = st.turn;
@@ -399,8 +439,9 @@ function cardHTML(k, ctrl, rot, extra=''){
   const C = CARDS[k];
   const polys = Object.keys(ARROW_POLY).map(d=>`<polygon points="${ARROW_POLY[d]}" class="${C.ar.includes(d)?'on':''}"/>`).join('');
   const cls = ctrl===0 ? 'c0' : ctrl===1 ? 'c1' : 'cn';
-  const turned = rot && faceMode && mode==='local';
-  return `<span class="card ${cls} ${turned?'turned':''} ${extra}" data-k="${k}">`+
+  const face = faceMode && mode==='local';   // modalità "carte verso chi le controlla"
+  const turned = rot && face;
+  return `<span class="card ${cls} ${turned?'turned':''} ${face?'face':''} ${extra}" data-k="${k}">`+
     `<svg viewBox="0 0 100 100" class="${rot&&!turned?'rot':''}" aria-hidden="true">${polys}</svg>`+
     `<span class="cbody"><span class="cname">${esc(C.n)}</span><span class="catk">${C.a}</span>`+
     `<span class="cmeta"><span class="adot" style="--ac:var(${ATTR_VAR[C.at]})" title="${ATTR_LABEL[C.at]}"></span><span>L${C.l}</span></span></span></span>`;
@@ -468,12 +509,50 @@ function render(){
   // animations
   if(st.fx && st.seq!==animSeq && !lobby){
     animSeq = st.seq;
-    const anim = (i, cls)=>{ const c = document.querySelector(`.cell[data-i="${i}"] .card`); if(c){ c.classList.remove(cls); void c.offsetWidth; c.classList.add(cls); } };
-    if(st.fx.placed!=null) anim(st.fx.placed, 'drop');
-    (st.fx.flips||[]).forEach(i=>{
-      anim(i,'spin');
-      const c = document.querySelector(`.cell[data-i="${i}"] .card`);
-      if(c) c.classList.toggle('p1', st.board[i] && st.board[i].c===1); // verso inverso per il Giocatore 2
+    const cellOf = i => document.querySelector(`.cell[data-i="${i}"]`);
+    const cardOf = i => document.querySelector(`.cell[data-i="${i}"] .card`);
+    const anim = (i, cls)=>{ const c = cardOf(i); if(c){ c.classList.remove(cls); void c.offsetWidth; c.classList.add(cls); } };
+    // Affondo: la cella `from` si sposta verso la cella `to`. La direzione si misura sullo schermo, quindi vale anche a tavolo capovolto.
+    // Una carta può colpire due volte nella stessa mossa (prima rispondendo in uno scontro, poi come attaccante della combo): due "slot" (1 e 2).
+    // b = quante pause "aumento ATK" sono già state inserite nella scaletta fino a questo passo (ognuna ritarda tutto ciò che segue).
+    const lunge = (from, to, k, b)=>{
+      const a = cellOf(from), c = cellOf(to); if(!a || !c) return;
+      const ra = a.getBoundingClientRect(), rc = c.getBoundingClientRect();
+      const dx = rc.left-ra.left, dy = rc.top-ra.top, len = Math.hypot(dx,dy) || 1;
+      const slot = a.classList.contains('lunge') ? 2 : 1;
+      a.style.setProperty('--lx'+slot, dx/len);
+      a.style.setProperty('--ly'+slot, dy/len);
+      a.style.setProperty('--m'+slot, k);
+      a.style.setProperty('--b'+slot, b);
+      a.classList.add(slot===2 ? 'lunge2' : 'lunge');
+    };
+    if(st.fx.placed!=null && st.fx.drop!==false) anim(st.fx.placed, 'drop');
+    // Ogni attacco (k = posizione nella catena di combo) = [aumento ATK se c'è vantaggio di Attributo], affondo dell'attaccante
+    // (e del difensore, se c'è scontro), poi la cattura ruota la carta.
+    let boosts = 0;
+    (st.fx.attacks||[]).forEach((at, k)=>{
+      if(at.boost){
+        boosts++;
+        const n = cardOf(at.a)?.querySelector('.catk');
+        if(n){
+          n.style.setProperty('--atk-from', at.boost.from);
+          n.style.setProperty('--atk-to', at.boost.to);
+          n.style.setProperty('--bk', k);
+          n.style.setProperty('--bb', boosts);
+          n.classList.add('boost');
+        }
+      }
+      lunge(at.a, at.d, k, boosts);
+      if(at.clash) lunge(at.d, at.a, k, boosts);
+      if(at.flip!=null){
+        anim(at.flip, 'spin');
+        const c = cardOf(at.flip);
+        if(c){
+          c.classList.toggle('p1', st.board[at.flip] && st.board[at.flip].c===1); // verso inverso per il Giocatore 2
+          c.style.setProperty('--n', k);
+          c.style.setProperty('--b', boosts);
+        }
+      }
     });
   }
 }
@@ -621,7 +700,7 @@ document.addEventListener('click', e=>{
     const i = +t.dataset.i, x = state.board[i];
     if(state.status==='play' && state.pending && state.pending.t.includes(i) && canAct(state.turn)){ inspected = x.k; return commit(st=>chooseTarget(st,i)); }
     if(x && x.k){ inspected = x.k; return render(); }
-    if(!x && state.status==='play' && selHand!=null && !state.pending && canAct(state.turn)){ const hi = selHand; return commit(st=>place(st,hi,i)); }
+    if(!x && state.status==='play' && selHand!=null && !state.pending && canAct(state.turn)){ const hi = selHand; return commit(st=>Place(st,hi,i)); }
     return render();
   }
 });
