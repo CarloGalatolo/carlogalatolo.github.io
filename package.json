@@ -1,0 +1,9 @@
+{
+  "name": "link-grid",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Link Grid: gioco di carte amatoriale ispirato a Triple Triad e Tetra Master, con i mostri Link di Yu-Gi-Oh!",
+  "scripts": {
+    "test": "node --test \"tests/*.test.js\""
+  }
+}
