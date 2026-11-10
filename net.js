@@ -36,7 +36,7 @@ function peerErrorText(err){
   return 'Connessione non riuscita. Riprova tra poco.';
 }
 // ===== costanti e controllo della connessione =====
-const ONLINE_NOTE = 'La partita passa direttamente tra i due browser: entrambi devono tenere aperta questa pagina.';
+const ONLINE_NOTE = '';
 const JOIN_TRIES = 5;	// tentativi automatici dell'ospite prima di arrendersi
 const PING_MS = 4000, DEAD_MS = 14000;	// ping periodico tra i due browser; senza risposta per DEAD_MS la connessione si considera morta
 function noteSeen(){ online.lastSeen = Date.now(); }

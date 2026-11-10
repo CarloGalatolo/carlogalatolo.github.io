@@ -25,33 +25,32 @@
 
   <main id="menu">
     <div class="menu">
-      <section>
-		<h2>Su questo dispositivo</h2>
-		<p>Due giocatori a turno sullo stesso schermo.</p>
-		<div class="row"><label for="ld0">Giocatore 1</label><select id="ld0"></select></div>
-		<div class="row"><label for="ld1">Giocatore 2</label><select id="ld1"></select></div>
-		<div class="row"><label style="min-width:0"><input type="checkbox" id="faceOpt"> Carte rivolte verso chi le controlla</label></div>
-		<button class="btn primary" id="btnLocal">Inizia la partita</button>
-		<div class="note resume" id="localResume" hidden></div>
-      </section>
-      <section>
-		<h2>Online, in una stanza</h2>
-		<p>Crea una stanza e dai il codice all’altro giocatore, oppure entra con il suo codice. Funziona da qualsiasi browser.</p>
-		<div class="row"><label for="od">Il tuo mazzo</label><select id="od"></select></div>
-		<div class="row"><button class="btn primary" id="btnCreate" disabled>Crea una stanza</button></div>
-		<div class="row"><input type="text" id="joinCode" maxlength="5" placeholder="CODICE" aria-label="Codice della stanza" autocomplete="off"><button class="btn" id="btnJoin" disabled>Entra</button></div>
-		<div class="row"><label style="min-width:0"><input type="checkbox" id="specOpt"> Entra come spettatore (se la stanza è già piena lo diventi comunque)</label></div>
-		<div class="note" id="onlineNote">Controllo della connessione…</div>
-		<div class="err" id="menuErr" hidden></div>
-		<div class="note resume" id="resumeBox" hidden></div>
-      </section>
-	</div>
-	<div class="rulesrow">
-		<div class="box rules" id="rulesMenu"></div>
-		<div class="box rules" id="rulesSetup"></div>
-	</div>
-	<div class="decklist" id="deckPreview"></div>
-  </main>
+		<section>
+			<h2>Su questo dispositivo</h2>
+			<p>Due giocatori a turno sullo stesso schermo.</p>
+			<div class="row"><label for="ld0">Mazzo del Giocatore 1</label><select id="ld0"></select></div>
+			<div class="row"><label for="ld1">Mazzo del Giocatore 2</label><select id="ld1"></select></div>
+			<div class="row"><label style="min-width:0"><input type="checkbox" id="faceOpt"> Carte rivolte verso chi le controlla</label></div>
+			<button class="btn primary" id="btnLocal">Inizia la partita</button>
+			<div class="note resume" id="localResume" hidden></div>
+		</section>
+		<section>
+			<h2>Online, in una stanza</h2>
+			<p>Crea una stanza e dai il codice all’altro giocatore, oppure entra con il suo codice. Tenete entrambi questa pagina aperta.</p>
+			<div class="row"><label for="od">Il tuo mazzo</label><select id="od"></select></div>
+			<div class="row"><button class="btn primary" id="btnCreate" disabled>Crea una stanza</button><input type="text" id="joinCode" maxlength="5" placeholder="CODICE" aria-label="Codice della stanza" autocomplete="off"><button class="btn" id="btnJoin" disabled>Entra</button></div>
+			<div class="row"><label style="min-width:0"><input type="checkbox" id="specOpt"> Entra come spettatore (se la stanza è già piena lo diventi comunque)</label></div>
+			<div class="note" id="onlineNote">Controllo della connessione…</div>
+			<div class="err" id="menuErr" hidden></div>
+			<div class="note resume" id="resumeBox" hidden></div>
+		</section>
+		</div>
+		<div class="rulesrow">
+			<div class="box rules" id="rulesMenu"></div>
+			<div class="box rules" id="rulesSetup"></div>
+		</div>
+		<div class="decklist" id="deckPreview"></div>
+	</main>
 
   <main id="game" class="game" hidden>
     <div class="box" id="statusBox" aria-live="polite"><div class="status" id="status"></div></div>

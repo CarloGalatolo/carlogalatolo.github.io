@@ -58,6 +58,7 @@ test('mano: il bordo unico compare solo quando il giocatore di turno deve scegli
   env.show({state: env.playState(0)});
   assert.ok(env.el('handBottom')._cls.has('pick'), 'locale: tocca a chi ha la mano in basso, nessuna carta scelta');
   assert.ok(!env.el('handTop')._cls.has('pick'));
+  assert.equal(env.el('handBottom').vars['--hc'], 'var(--p0)'); assert.equal(env.el('handTop').vars['--hc'], 'var(--p1)', 'ogni mano ha il colore del suo giocatore');
   env.show({state: env.playState(0), selHand: 2}); assert.ok(!env.el('handBottom')._cls.has('pick'), 'carta già scelta: niente bordo');
   env.show({state: env.playState(1), mode:'online', mySeat:0}); assert.ok(!env.el('handBottom')._cls.has('pick'), 'online, non è il mio turno');
   env.show({state: env.playState(0), mode:'online', mySeat:0}); assert.ok(env.el('handBottom')._cls.has('pick'), 'online, è il mio turno');

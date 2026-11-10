@@ -267,6 +267,7 @@ function renderHand(el, seat, isTop){
   let h = '';
   // deve scegliere la carta da giocare: un solo bordo racchiude tutta la mano (prova; per tornare al bordo su ogni carta vedi .hand.pick in style.css)
   el.classList.toggle('pick', selHand==null && st.status==='play' && !st.pending && st.turn===seat && canAct(seat) && !isBusy());
+  el.style.setProperty('--hc', `var(--p${seat})`);	// colore del bordo della mano: quello del suo giocatore
   for(let i=0;i<5;i++){
     if(i>=hand.length){ h += '<span class="slot"></span>'; continue; }
     const k = hand[i];
@@ -583,9 +584,9 @@ function exitToMenu(){
 function deckOptions(sel){ return Object.entries(DECKS).map(([k,d])=>`<option value="${k}" ${k===sel?'selected':''}>${d.name}</option>`).join(''); }
 $('ld0').innerHTML = deckOptions('alba'); $('ld1').innerHTML = deckOptions('tramonto'); $('od').innerHTML = deckOptions('alba');
 $('deckPreview').innerHTML = Object.values(DECKS).map(d=>`<details><summary>Mazzo ${d.name}</summary><div class="minicards">${d.cards.map(k=>cardHTML(k,null,false)).join('')}</div></details>`).join('');
+
 // Schema dei vantaggi di Attributo (SVG, generato da BEATS): ogni freccia va da chi ha il vantaggio a chi lo subisce.
-// Fuoco/Vento/Terra/Acqua in cerchio; Luce e Oscurità con doppia freccia. I colori seguono il tema (variabili CSS).
-function attrDiagram(){
+function attrDiagram() {
   const POS = {FUOCO:[130,24], VENTO:[205,75], TERRA:[130,126], ACQUA:[55,75], LUCE:[340,28], OSCURITA:[340,122]};
   const W = 88, H = 26, GAP = 3;   // dimensioni della "pillola" di ogni Attributo e distanza dalla punta della freccia
   const f = n => n.toFixed(1);
@@ -614,11 +615,12 @@ function attrDiagram(){
 $('rulesSetup').innerHTML = `<details open>
 	<summary>Preparazione</summary>
 	<ol>
-		<li><b>Chi inizia.</b> Entrambi i giocatori tirano un dado: il numero più alto determina il primo giocatore (in caso di pareggio si ritira).</li>
+		<li><b>Chi inizia.</b> Determinate casualmente il primo giocatore (per esempio tirando i dadi).</li>
 		<li><b>Campo.</b> Si gioca in una griglia di 5×5 spazi. Il primo giocatore numera le colonne da 1 a 5 partendo dalla sua sinistra; il secondo numera le righe da 1 a 5 partendo dalla più vicina a sé.</li>
-		<li><b>Spazi bloccati.</b> Entrambi i giocatori tirano un dado: il dado del primo giocatore indica la colonna, quello del secondo la riga; lo spazio all’incrocio viene bloccato e non vi si potranno giocare carte. <b>Si ripete finché gli spazi bloccati sono 5.</b></li>
-		<li><b>Singolo 6.</b> Il giocatore che ha fatto 6 al dado sceglie il numero, da 1 a 5, tra gli spazi ancora liberi: la colonna se è il primo giocatore, la riga se è il secondo.</li>
-		<li><b>Doppio 6.</b> Se entrambi i giocatori fanno 6 al dado, il primo giocatore sceglie la colonna, poi il secondo sceglie la riga: lo spazio indicato dev’essere libero.</li>
+		<li><b>Spazi bloccati.</b> Tirate un dado ciascuno: il dado del primo giocatore indica la colonna, quello del secondo la riga; lo spazio all’incrocio viene bloccato e non vi si potrà giocare carte. <b>Ripetere fino a bloccare 5 spazi.</b></li>
+		<li><b>Singolo 6.</b> Chi fa 6 al dado sceglie il numero, da 1 a 5, tra gli spazi ancora liberi: la colonna se è il primo giocatore, la riga se è il secondo.</li>
+		<li><b>Doppio 6.</b> Se entrambi fate 6 al dado, il primo giocatore sceglie la colonna, poi il secondo sceglie la riga.</li>
+		<li><b>Prima mano.</b> Mescolate i mazzi e pescate 5 carte. Quando rimanete senza carte in mano, pescate altre 5 carte all'inizio del vostro turno.</li>
 	</ol>
 	<p class="note">Nel simulatore, la preparazione è gestita automaticamente.</p>
 </details>`;
@@ -631,8 +633,8 @@ const RULES_HTML =
 		<li>Piazza un mostro in uno spazio libero. Se una sua freccia punta un mostro avversario, <b>deve attaccarlo</b>; se ne punta più di uno, scegline <b>uno solo</b>.</li>
 		<li>Se il difensore non ha la freccia opposta, è <b>catturato</b>. Altrimenti si confrontano gli ATK: chi ne ha meno viene catturato, con il pareggio non succede nulla.</li>
 		<li>Il mostro catturato ruota verso di te e, se ora punta altri mostri avversari, attacca a sua volta (combo). Se il tuo attaccante perde, viene catturato dall’avversario e il turno finisce.</li>
-		<li>Quando non restano più spazi liberi, la partita termina: <b><u>vince chi controlla più mostri</u></b> (in caso di parità <b>vince il primo giocatore</b>).</li>
 	</ul>
+	Quando non restano più spazi liberi, la partita termina: <b><u>vince chi controlla più mostri</u></b> (in caso di parità <b>vince il primo giocatore</b>).
 	<p class="note">Gli effetti dei mostri sono ignorati.</p>
 	<div><b>Vantaggi di Attributo</b> (+${BONUS} ATK all’attaccante):</div>
 	${attrDiagram()}

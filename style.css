@@ -77,7 +77,7 @@ input[type=text]{text-transform:uppercase;letter-spacing:.15em;width:8.5em;font-
 .hand.bottom .hcard.sel{transform:translateY(-8px)}
 .hand.topside .hcard.sel{transform:translateY(8px)}
 .hcard.sel .card{box-shadow:0 0 0 3px var(--focus)}
-.hand.pick{box-shadow:0 0 0 2px var(--focus)}	/* è il turno di questo giocatore e deve scegliere la carta da giocare: un bordo nel colore normale racchiude tutta la mano */
+.hand.pick{box-shadow:0 0 0 2px var(--hc,var(--focus))}	/* è il turno di questo giocatore e deve scegliere la carta da giocare: un bordo nel colore del giocatore (--hc, impostato da renderHand) racchiude tutta la mano */
 .board{display:grid;grid-template-columns:1.3rem repeat(5,var(--cell));grid-template-rows:1.2rem repeat(5,var(--cell));gap:5px;margin-left:-1.3rem;position:relative}
 .colpick{position:absolute;inset:0;padding:0;border:3px solid var(--sel);border-radius:12px;background:color-mix(in srgb,var(--sel) 8%,transparent);cursor:pointer;z-index:2}	/* bordo unico attorno a una colonna selezionabile (doppio 6) */
 .colpick:hover,.colpick:focus-visible{background:color-mix(in srgb,var(--sel) 20%,transparent)}
