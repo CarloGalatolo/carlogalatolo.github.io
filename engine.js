@@ -1,37 +1,38 @@
 // Link Grid — motore di gioco: regole pure, senza interfaccia né rete. Lavora su uno stato JSON (vedi newGame) e non tocca mai il DOM.
-// Nel browser è uno script classico (le funzioni diventano globali per net.js e script.js); in Node si carica con require() (vedi tests/).
+// Nel browser è uno script classico (le funzioni diventano globali per net.js e graphics.js); in Node si carica con require() (vedi tests/).
 const CARDS = {
-  monk:{n:'Monk of the Tenyi',l:1,a:1000,at:'TERRA',ar:['B'],nx:1},
-  seaangel:{n:'Marincess Sea Angel',l:1,a:1000,at:'ACQUA',ar:['L']},
-  kaina:{n:'Sky Striker Ace - Kaina',l:1,a:1500,at:'TERRA',ar:['BR']},
-  kagari:{n:'Sky Striker Ace - Kagari',l:1,a:1500,at:'FUOCO',ar:['TL']},
-  hagakure:{n:'Shinobi Insect Hagakuremino',l:2,a:1000,at:'VENTO',ar:['TL','B']},
-  lanpho:{n:'LANphorhynchus',l:2,a:1200,at:'LUCE',ar:['BL','BR'],nx:1},
-  sprind:{n:'Spright Sprind',l:2,a:1400,at:'FUOCO',ar:['TR','BL']},
-  earlie:{n:'Pitknight Earlie',l:2,a:1500,at:'FUOCO',ar:['TR','R']},
-  elphase:{n:'Elphase',l:2,a:2000,at:'VENTO',ar:['T','R']},
-  traffic:{n:'Traffic Ghost',l:3,a:1800,at:'OSCURITA',ar:['BL','B','BR'],nx:1},
-  trigate:{n:'Tri-Gate Wizard',l:3,a:2200,at:'TERRA',ar:['T','L','R']},
-  justify:{n:'S-Force Justify',l:3,a:2600,at:'LUCE',ar:['TL','T','TR']},
-  berserker:{n:'Berserker of the Tenyi',l:3,a:3000,at:'OSCURITA',ar:['T','TR','BR'],nx:1},
-  gryphon:{n:'Knightmare Gryphon',l:4,a:2500,at:'LUCE',ar:['T','L','R','B']},
-  linkmail:{n:'Linkmail Archfiend',l:4,a:2800,at:'OSCURITA',ar:['TL','L','BL','BR']},
-  mermaid:{n:'Knightmare Mermaid',l:1,a:1000,at:'ACQUA',ar:['B']},
-  striker:{n:'Striker Dragon',l:1,a:1000,at:'OSCURITA',ar:['L']},
-  hayate:{n:'Sky Striker Ace - Hayate',l:1,a:1500,at:'VENTO',ar:['BL']},
-  shizuku:{n:'Sky Striker Ace - Shizuku',l:1,a:1500,at:'ACQUA',ar:['TR']},
-  splash:{n:'Splash Mage',l:2,a:1100,at:'ACQUA',ar:['TR','BR']},
-  security:{n:'Security Dragon',l:2,a:1100,at:'LUCE',ar:['T','B']},
-  trackblack:{n:'Trackblack',l:2,a:1200,at:'LUCE',ar:['TL','BR']},
-  hiita:{n:'Hiita the Fire Charmer, Ablaze',l:2,a:1850,at:'FUOCO',ar:['BL','BR']},
-  phoenix:{n:'Knightmare Phoenix',l:2,a:1900,at:'FUOCO',ar:['T','R']},
-  raten:{n:'Ra’ten, the Heavenly General',l:3,a:2200,at:'TERRA',ar:['TL','BL','BR']},
-  flash:{n:'Flash Charge Dragon',l:3,a:2300,at:'OSCURITA',ar:['TL','T','TR']},
-  ningirsu:{n:'Ningirsu the World Chalice Warrior',l:3,a:2500,at:'TERRA',ar:['T','L','R']},
-  gaia:{n:'Gaia Saber, the Lightning Shadow',l:3,a:2600,at:'TERRA',ar:['L','R','B'],nx:1},
-  firewall:{n:'Firewall Dragon',l:4,a:2500,at:'LUCE',ar:['T','L','R','B']},
-  zeroboros:{n:'Topologic Zeroboros',l:4,a:3000,at:'OSCURITA',ar:['TL','TR','BL','BR']}
+	monk:{n:'Monk of the Tenyi',l:1,a:1000,at:'TERRA',ar:['B']},
+	seaangel:{n:'Marincess Sea Angel',l:1,a:1000,at:'ACQUA',ar:['L']},
+	kaina:{n:'Sky Striker Ace - Kaina',l:1,a:1500,at:'TERRA',ar:['BR']},
+	kagari:{n:'Sky Striker Ace - Kagari',l:1,a:1500,at:'FUOCO',ar:['TL']},
+	hagakure:{n:'Shinobi Insect Hagakuremino',l:2,a:1000,at:'VENTO',ar:['TL','B']},
+	lanpho:{n:'LANphorhynchus',l:2,a:1200,at:'LUCE',ar:['BL','BR']},
+	sprind:{n:'Spright Sprind',l:2,a:1400,at:'FUOCO',ar:['TR','BL']},
+	earlie:{n:'Pitknight Earlie',l:2,a:1500,at:'FUOCO',ar:['TR','R']},
+	elphase:{n:'Elphase',l:2,a:2000,at:'VENTO',ar:['T','R']},
+	traffic:{n:'Traffic Ghost',l:3,a:1800,at:'OSCURITA',ar:['BL','B','BR']},
+	trigate:{n:'Tri-Gate Wizard',l:3,a:2200,at:'TERRA',ar:['T','L','R']},
+	justify:{n:'S-Force Justify',l:3,a:2600,at:'LUCE',ar:['TL','T','TR']},
+	berserker:{n:'Berserker of the Tenyi',l:3,a:3000,at:'OSCURITA',ar:['T','TR','BR']},
+	gryphon:{n:'Knightmare Gryphon',l:4,a:2500,at:'LUCE',ar:['T','L','R','B']},
+	linkmail:{n:'Linkmail Archfiend',l:4,a:2800,at:'OSCURITA',ar:['TL','L','BL','BR']},
+	mermaid:{n:'Knightmare Mermaid',l:1,a:1000,at:'ACQUA',ar:['B']},
+	striker:{n:'Striker Dragon',l:1,a:1000,at:'OSCURITA',ar:['L']},
+	hayate:{n:'Sky Striker Ace - Hayate',l:1,a:1500,at:'VENTO',ar:['BL']},
+	shizuku:{n:'Sky Striker Ace - Shizuku',l:1,a:1500,at:'ACQUA',ar:['TR']},
+	splash:{n:'Splash Mage',l:2,a:1100,at:'ACQUA',ar:['TR','BR']},
+	security:{n:'Security Dragon',l:2,a:1100,at:'LUCE',ar:['T','B']},
+	trackblack:{n:'Trackblack',l:2,a:1200,at:'LUCE',ar:['TL','BR']},
+	hiita:{n:'Hiita the Fire Charmer, Ablaze',l:2,a:1850,at:'FUOCO',ar:['BL','BR']},
+	phoenix:{n:'Knightmare Phoenix',l:2,a:1900,at:'FUOCO',ar:['T','R']},
+	raten:{n:'Ra’ten, the Heavenly General',l:3,a:2200,at:'TERRA',ar:['TL','BL','BR']},
+	flash:{n:'Flash Charge Dragon',l:3,a:2300,at:'OSCURITA',ar:['TL','T','TR']},
+	ningirsu:{n:'Ningirsu the World Chalice Warrior',l:3,a:2500,at:'TERRA',ar:['T','L','R']},
+	gaia:{n:'Gaia Saber, the Lightning Shadow',l:3,a:2600,at:'TERRA',ar:['L','R','B']},
+	firewall:{n:'Firewall Dragon',l:4,a:2500,at:'LUCE',ar:['T','L','R','B']},
+	zeroboros:{n:'Topologic Zeroboros',l:4,a:3000,at:'OSCURITA',ar:['TL','TR','BL','BR']}
 };
+
 const DECKS = {
   alba:{name:'Alba',cards:['monk','seaangel','kaina','kagari','hagakure','lanpho','sprind','earlie','elphase','traffic','trigate','justify','berserker','gryphon','linkmail']},
   tramonto:{name:'Tramonto',cards:['mermaid','striker','hayate','shizuku','splash','security','trackblack','hiita','phoenix','raten','flash','ningirsu','gaia','firewall','zeroboros']}
@@ -234,7 +235,7 @@ function formatLog(m, view){
 }
 
 if(typeof module !== 'undefined' && module.exports){
-  module.exports = {CARDS, DECKS, BEATS, ATTR_LABEL, DIRV, BONUS, setRng, d6, shuffle, pName, addLog, tp, tpa, tv, vecs, colToC, rowToR, colNum, rowNum,
-    newGame, blockCell, advanceSetup, setupOptions, chooseSetup, targetsOf, Place, runCapture, chooseTarget, ResolveAttack, score, endTurn,
-    actingSeat, applyMove, whoName, formatLog};
+	module.exports = {CARDS, DECKS, BEATS, ATTR_LABEL, DIRV, BONUS, setRng, d6, shuffle, pName, addLog, tp, tpa, tv, vecs, colToC, rowToR, colNum, rowNum,
+		newGame, blockCell, advanceSetup, setupOptions, chooseSetup, targetsOf, Place, runCapture, chooseTarget, ResolveAttack, score, endTurn,
+		actingSeat, applyMove, whoName, formatLog};
 }

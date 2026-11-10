@@ -12,7 +12,7 @@ function cardHTML(k, ctrl, rot, extra=''){
   const C = CARDS[k];
   const polys = Object.keys(ARROW_POLY).map(d=>`<polygon points="${ARROW_POLY[d]}" class="${C.ar.includes(d)?'on':''}"/>`).join('');
   const cls = ctrl===0 ? 'c0' : ctrl===1 ? 'c1' : 'cn';
-  const face = faceMode && mode==='local';   // modalità "carte verso chi le controlla"
+  const face = faceMode && mode===Mode.LOCAL;   // modalità "carte verso chi le controlla"
   const turned = rot && face;
   return `<span class="card ${cls} ${turned?'turned':''} ${face?'face':''} ${extra}" data-k="${k}">`+
     `<svg viewBox="0 0 100 100" class="${rot&&!turned?'rot':''}" aria-hidden="true">${polys}</svg>`+
@@ -23,7 +23,7 @@ const DIR_IT = {T:'su',B:'giù',L:'sinistra',R:'destra',TL:'su a sinistra',TR:'s
 function cardLabel(k){ const C=CARDS[k]; return `${C.n}, ATK ${C.a}, Link ${C.l}, ${ATTR_LABEL[C.at]}, frecce ${C.ar.map(d=>DIR_IT[d]).join(', ')}`; }
 
 // ---------- app state ----------
-let mode = null;          // 'local' | 'online'
+let mode = null;          // Mode.LOCAL | Mode.ONLINE (enum definita in net.js) | null = menu, nessuna partita
 let state = null;
 let localView = 0;
 let faceMode = false;
@@ -39,16 +39,16 @@ let flash = '';
 // registro e scelte compaiono solo dopo che il relativo lancio è stato mostrato) e nessuno può agire. Solo UI: non viene mai sincronizzato.
 let present = null, presentTimer = 0, setupSeq = -1;
 
-function viewSeat(){ return mode==='online' ? (mySeat ?? 0) : localView; }
+function viewSeat(){ return mode===Mode.ONLINE ? (mySeat ?? 0) : localView; }
 function seatName(s){
-  if(mode==='online'){ if(mySeat===null) return pName(s); return s===mySeat ? 'Tu' : 'Avversario'; }
+  if(mode===Mode.ONLINE){ if(mySeat===null) return pName(s); return s===mySeat ? 'Tu' : 'Avversario'; }
   return pName(s);
 }
 // Come si chiama un giocatore nei messaggi, dal punto di vista di chi guarda (le funzioni pure sono nel motore: whoName, formatLog)
-const viewOf = () => ({online: mode==='online' && mySeat!==null, seat: mySeat});
+const viewOf = () => ({online: mode===Mode.ONLINE && mySeat!==null, seat: mySeat});
 function who(s, cap){ return whoName(s, cap, viewOf()); }
 function fmtMsg(m){ return formatLog(m, viewOf()); }
-function canAct(seat){ return !present && (mode==='local' || mySeat===seat); }
+function canAct(seat){ return !present && (mode===Mode.LOCAL || mySeat===seat); }
 // Vero mentre i dadi di preparazione girano o la sequenza di animazione di una mossa è in corso: i click su carte e caselle vengono ignorati.
 function isBusy(){ return !!(present || fxView || online.awaiting); }
 function deckOf(s){ return state.decksel ? state.decksel[s] : state.players?.['s'+s]?.deck; }
@@ -63,14 +63,14 @@ function commit(fn){
   st.seq = (state.seq||0) + 1;
   state = st; selHand = null;
   render();
-  if(mode==='online') pushOnline(st);
+  if(mode===Mode.ONLINE) pushOnline(st);
 }
 // Unico punto da cui l'interfaccia compie una mossa. In locale o da host la applica il motore (applyMove la valida);
 // l'ospite online manda solo la mossa all'host, che la calcola e rimanda lo stato.
 function act(move){
   if(!state) return;
-  if(mode==='online' && !online.host){ sendMove(move); return; }
-  const seat = mode==='online' ? mySeat : actingSeat(state);
+  if(mode===Mode.ONLINE && !online.host){ sendMove(move); return; }
+  const seat = mode===Mode.ONLINE ? mySeat : actingSeat(state);
   commit(st=>applyMove(st, seat, move));
 }
 // ---------- animazione dei dadi di preparazione ----------
@@ -149,7 +149,7 @@ function refreshScores(){	// aggiorna solo i due contatori "Controllati", senza 
 }
 function setCardCtrl(i, ctrl){	// cambia in loco colore e frecce di una carta (stessa logica di cardHTML), senza ricostruirla: le altre animazioni in corso non si interrompono
   const cell = cellEl(i), card = cardEl(i); if(!cell || !card) return;
-  const rot = ctrl!==viewSeat(), turned = rot && faceMode && mode==='local';
+  const rot = ctrl!==viewSeat(), turned = rot && faceMode && mode===Mode.LOCAL;
   card.classList.remove('c0','c1','cn'); card.classList.add(ctrl===0 ? 'c0' : 'c1');
   card.classList.toggle('turned', turned);
   const svg = card.querySelector('svg'); if(svg) svg.classList.toggle('rot', rot && !turned);
@@ -236,7 +236,7 @@ function render(){
       `<span class="count">${DECKS[deckOf(s)].name}, mazzo ${st.piles[s].length}</span>`+
       `<span class="count">Controllati <span class="big">${sc}</span></span>`;
   }
-  $('infoTop').classList.toggle('turned', faceMode && mode==='local' && !lobby);
+  $('infoTop').classList.toggle('turned', faceMode && mode===Mode.LOCAL && !lobby);
   // hands
   renderHand($('handTop'), topSeat, true);
   renderHand($('handBottom'), botSeat, false);
@@ -255,6 +255,8 @@ function renderHand(el, seat, isTop){
   const vs = viewSeat(); const rot = seat!==vs;
   const hand = st.hands[seat];
   let h = '';
+  // deve scegliere la carta da giocare: un solo bordo racchiude tutta la mano (prova; per tornare al bordo su ogni carta vedi .hand.pick in style.css)
+  el.classList.toggle('pick', selHand==null && st.status==='play' && !st.pending && st.turn===seat && canAct(seat) && !isBusy());
   for(let i=0;i<5;i++){
     if(i>=hand.length){ h += '<span class="slot"></span>'; continue; }
     const k = hand[i];
@@ -266,6 +268,9 @@ function renderHand(el, seat, isTop){
 function renderBoard(){
   const st = state, vs = viewSeat(), el = $('board');
   const flip = vs===1;
+  // colore del giocatore che deve scegliere (turno, o chi sceglie nella preparazione): lo usano i bordi di selezione sul campo (--sel in style.css)
+  const actor = present ? null : st.status==='play' ? st.turn : st.status==='setup' && st.setup.pending ? st.setup.pending.chooser : null;
+  if(actor!==null) el.style.setProperty('--pc', `var(--p${actor})`); else el.style.removeProperty('--pc');
   const lobby = st.status==='lobby';
   const showNums = !lobby && st.first!=null;
   let h = `<span class="lab"></span>`;
@@ -308,32 +313,51 @@ function renderBoard(){
   }
   el.innerHTML = h;
 }
-function renderStatus(){
-  const st = state; const el = $('status'); const box = $('statusBox');
-  box.classList.remove('overlay'); box.style.removeProperty('--pc');
-  let main = '', sub = '', action = '';
-  if(st.status==='lobby'){ main = 'Stanza in attesa'; sub = st.players?.s1 ? (online.peersOnline ? 'Entrambi i giocatori sono nella stanza.' : 'Il secondo giocatore si è disconnesso.') : 'In attesa del secondo giocatore.'; }
-  else if(present){ main = 'Preparazione del campo'; sub = 'Lancio dei dadi…'; }
-  else if(st.status==='setup'){ main = 'Preparazione del campo'; const p = st.setup.pending; sub = p ? (canAct(p.chooser) ? 'Tocca a te scegliere: tocca una casella evidenziata nel campo.' : `${seatName(p.chooser)} sta scegliendo.`) : ''; }
-  else if(st.status==='play'){
-    const me = canAct(st.turn);
-    if(st.pending){ main = me ? (mode==='local' ? `${pName(st.turn)}, scegli chi attaccare` : 'Scegli quale mostro attaccare') : `${seatName(st.turn)} sceglie chi attaccare`; sub = me ? 'Il tuo mostro punta più avversari: tocca quello evidenziato che vuoi attaccare.' : ''; }
-    else if(me){ main = mode==='local' ? `Turno di ${pName(st.turn)}` : 'Tocca a te'; sub = selHand==null ? 'Scegli una carta dalla mano, poi uno spazio libero.' : 'Ora tocca uno spazio libero evidenziato.'; }
-    else { main = 'Turno dell’avversario'; sub = online.peersOnline ? '' : 'L’avversario non è connesso in questo momento.'; }
-  } else if(st.status==='over'){
-    const r = st.result; box.classList.add('overlay'); box.style.setProperty('--pc', `var(--p${r.winner})`);
-    const esito = mode==='online' && mySeat!==null ? (r.winner===mySeat ? 'Hai vinto' : 'Hai perso') : `Vince ${pName(r.winner)}`;
-    main = `<span class="big">${esito}</span>`;
-    sub = `${r.score[0]} a ${r.score[1]}${r.tie ? ', pareggio risolto a favore di chi ha giocato per primo' : ''}.`;
-    // nuova partita: il pulsante sta nel box del risultato (in online lo vede solo chi è host, l'altro un avviso)
-    if(mode==='local') action = `<button class="btn primary" id="btnAgain">Gioca ancora</button>`;
-    else if(online.host) action = `<button class="btn primary" id="btnAgain">Nuova partita</button>`;
-    else if(mySeat!==null) action = `<span class="note">${esc(who(1-mySeat, true))} può avviare una nuova partita.</span>`;
-  }
-  const text = `${main}${sub?`<small>${esc(sub)}</small>`:''}${flash?`<small class="err">${esc(flash)}</small>`:''}`;
-  // con un'azione (fine partita) il box ha due colonne: a sinistra il risultato; a destra, nello spazio vuoto, il pulsante centrato in altezza
-  el.innerHTML = action ? `<div class="status-row"><div class="status-text">${text}</div><div class="status-action">${action}</div></div>` : text;
+
+function renderStatus()
+{
+	const st = state; const el = $('status'); const box = $('statusBox');
+	box.classList.remove('overlay', 'turnbox'); box.style.removeProperty('--pc');
+	let main = '', sub = '', action = '';
+	if(st.status==='lobby'){ main = 'Stanza in attesa'; sub = st.players?.s1 ? (online.peersOnline ? 'Entrambi i giocatori sono nella stanza.' : 'Il secondo giocatore si è disconnesso.') : 'In attesa del secondo giocatore.'; }
+	else if(present){ main = 'Preparazione del campo'; sub = 'Lancio dei dadi…'; }
+	else if(st.status==='setup'){
+		const p = st.setup.pending;
+		if(!p) main = 'Preparazione del campo';
+		else {
+			// la scelta si fa sul campo; qui l'istruzione (col doppio 6, prima fase, si sceglie un'intera colonna) e, se un dado ha fissato l'altra coordinata, quale
+			const what = p.stage==='col' ? 'la colonna' : 'la riga', whole = p.stage==='col' && p.row==null;
+			const fixed = p.stage==='col' ? (p.row!=null ? `La riga è ${p.row}. ` : '') : `La colonna è ${p.col}. `;
+			if(canAct(p.chooser)){
+				main = `${mode===Mode.LOCAL ? pName(p.chooser)+', scegli' : 'Scegli'} ${what}`;
+				sub = `${fixed}Scegli ${whole ? 'una colonna' : 'una casella'}.`;
+			} else { main = `In attesa che ${esc(who(p.chooser))} scelga ${what}`; sub = fixed.trim(); }
+		}
+	}
+	else if(st.status==='play'){
+		const me = canAct(st.turn);
+		if (st.pending) { main = me ? (mode===Mode.LOCAL ? `${pName(st.turn)}, scegli chi attaccare` : 'Scegli quale mostro attaccare') : `${seatName(st.turn)} sceglie chi attaccare`; sub = me ? 'Il tuo mostro punta più avversari: tocca quello che vuoi attaccare.' : ''; }
+		else if (me) { main = mode===Mode.LOCAL ? `Turno di ${pName(st.turn)}` : 'Tocca a te'; sub = selHand==null ? 'Scegli una carta dalla mano.' : 'Scegli uno spazio libero.'; }
+		else { main = 'Turno dell’avversario'; sub = online.peersOnline ? '' : 'L’avversario non è connesso in questo momento.'; }
+	} else if(st.status==='over'){
+		const r = st.result; box.classList.add('overlay'); box.style.setProperty('--pc', `var(--p${r.winner})`);
+		const esito = mode===Mode.ONLINE && mySeat!==null ? (r.winner===mySeat ? 'Hai vinto' : 'Hai perso') : `Vince ${pName(r.winner)}`;
+		main = `<span class="big">${esito}</span>`;
+		sub = `${r.score[0]} a ${r.score[1]}${r.tie ? ', pareggio risolto a favore di chi ha giocato per primo' : ''}.`;
+		// nuova partita: il pulsante sta nel box del risultato (in online lo vede solo chi è host, l'altro un avviso)
+		if(mode===Mode.LOCAL) action = `<button class="btn primary" id="btnAgain">Gioca ancora</button>`;
+		else if(online.host) action = `<button class="btn primary" id="btnAgain">Nuova partita</button>`;
+		else if(mySeat!==null) action = `<span class="note">${esc(who(1-mySeat, true))} può avviare una nuova partita.</span>`;
+	}
+	// codice colore: il riquadro prende il colore del giocatore che deve agire (turno di gioco, oppure chi sceglie nella preparazione)
+	const actor = present ? null : st.status==='play' ? st.turn : st.status==='setup' && st.setup.pending ? st.setup.pending.chooser : null;
+	box.classList.toggle('turnbox', actor!==null);
+	if(actor!==null) box.style.setProperty('--pc', `var(--p${actor})`);
+	const text = `${main}${sub?`<small>${esc(sub)}</small>`:''}${flash?`<small class="err">${esc(flash)}</small>`:''}`;
+	// con un'azione (fine partita) il box ha due colonne: a sinistra il risultato; a destra, nello spazio vuoto, il pulsante centrato in altezza
+	el.innerHTML = action ? `<div class="status-row"><div class="status-text">${text}</div><div class="status-action">${action}</div></div>` : text;
 }
+
 const DIE = ['','⚀','⚁','⚂','⚃','⚄','⚅'];
 function renderExtra(){
   const st = state, box = $('extraBox');
@@ -350,16 +374,7 @@ function renderExtra(){
   if(dd) h += `<div class="dice">`+
     `<span class="die ${rl[0]?'rolling':''}" style="--dc:var(--p${st.first})"><b id="dieC">${DIE[dd[0]]}</b>colonna<small>${esc(seatName(st.first))}</small></span>`+
     `<span class="die ${rl[1]?'rolling':''}" style="--dc:var(--p${1-st.first})"><b id="dieR">${DIE[dd[1]]}</b>riga<small>${esc(seatName(1-st.first))}</small></span></div>`;
-  const p = present ? null : S.pending;	// la scelta compare solo a dadi fermi
-  if(p){
-    const what = p.stage==='col' ? 'la colonna' : 'la riga';
-    const fixed = p.stage==='col' ? (p.row!=null ? ` (la riga è ${p.row})` : '') : ` (la colonna è ${p.col})`;
-    if(canAct(p.chooser)){	// la scelta si fa sul campo: qui solo l'istruzione
-      const where = p.stage==='col' && p.row==null ? 'una delle colonne evidenziate' : 'una delle caselle evidenziate';
-      h += `<div>${esc(mode==='local'?pName(p.chooser)+', scegli':'Scegli')} ${what}${fixed}: tocca ${where} nel campo.</div>`;
-    } else h += `<div class="note">In attesa che ${esc(who(p.chooser))} scelga ${what}${fixed}.</div>`;
-  }
-  box.innerHTML = h;
+  box.innerHTML = h;	// l'invito a scegliere (colonna/riga/casella) sta nel riquadro di stato
 }
 function lobbyHTML(){
   const st = state; const P = st.players||{};
@@ -380,18 +395,57 @@ function lobbyHTML(){
   else h += `<p class="note">Stai guardando come spettatore: la stanza è già piena.</p>`;
   return h;
 }
+
+const attrTag = at => `<span class="attr-dot" style="--ac:var(${ATTR_VAR[at]})"></span>${ATTR_LABEL[at]}`;	// pallino colorato + nome dell'attributo
+const weakTo = at => Object.keys(BEATS).find(x => BEATS[x]===at);	// l'attributo che batte at
+// "forte/debole contro" in forma compatta: freccia (▲ vantaggio, ▼ svantaggio) + pallino e nome dell'attributo; il titolo (passando sopra) dice cosa significa la freccia
+const matchDot = (sym, what, at) => `<span class="mu" title="${what} ${ATTR_LABEL[at]}"><span role="img" aria-label="${what}">${sym}</span> ${attrTag(at)}</span>`;
+function inspectorDL(k) {
+	const C = CARDS[k];
+	return `
+	<dl>
+		<dt>Nome</dt><dd>${esc(C.n)}</dd>
+		<dt>ATK</dt><dd>${C.a}</dd>
+		<dt>Link</dt><dd>${C.l}</dd>
+		<dt>Attributo</dt><dd>${attrTag(C.at)} <span class="matchup">(${matchDot('▲', 'Forte contro', BEATS[C.at])}${matchDot('▼', 'Debole contro', weakTo(C.at))})</span></dd>
+		<dt>Frecce</dt><dd>${C.ar.map(d=>DIR_IT[d]).join(', ')}</dd>
+	</dl>`;
+}
+
+// Il riquadro dei dettagli è un blocco solo, aggiornato con la carta scelta, e non cambia mai altezza: la sua altezza minima è quella della descrizione
+// più alta tra tutte le carte (le righe vanno a capo diversamente a seconda della larghezza). Si misura fuori dal flusso di gioco: all'inizio, quando la larghezza
+// cambia (ridimensionamento) e quando i font sono caricati; durante la partita è solo un min-height.
+const EMPTY_INSP = 'Tocca una carta per vederne i dettagli.';
+let inspMeasured = false;
+function measureInspector(el){
+  if(!el.offsetParent) return;	// partita non visibile: non si può misurare, si riprova al prossimo ridisegno
+  const rows = [`<div class="insp"><span class="insp-empty"></span><div class="note" style="margin:0">${EMPTY_INSP}</div></div>`]
+    .concat(Object.keys(CARDS).map(k=>`<div class="insp"><span class="insp-empty"></span>${inspectorDL(k)}</div>`));
+  el.style.minHeight = '';
+  el.style.removeProperty('--insp-text');
+  el.innerHTML = rows.join('');	// sovrapposti nella stessa cella della griglia: l'altezza è quella del più alto
+  // 1) larghezza del testo più largo (tutto su una riga): la carta può ingrandirsi solo finché i testi ci stanno su una riga, poi scala fino alla dimensione minima (vedi --insp-cell in style.css)
+  el.classList.add('measuring');
+  el.style.setProperty('--insp-text', Math.ceil(Math.max(...[...el.querySelectorAll('dl')].map(d => d.getBoundingClientRect().width))) + 'px');
+  el.classList.remove('measuring');
+  // 2) altezza del più alto, con la carta già alla dimensione calcolata (i testi vanno a capo solo se la carta è già al minimo)
+  el.style.minHeight = el.offsetHeight + 'px';
+  inspMeasured = true;
+}
 function renderInspector(){
   const el = $('insp');
-  if(!inspected){ el.className='note'; el.textContent='Tocca una carta per vederne i dettagli.'; return; }
-  const C = CARDS[inspected];
-  el.className='insp';
-  el.innerHTML = cardHTML(inspected, null, false) + `<dl><dt>Nome</dt><dd>${esc(C.n)}</dd><dt>ATK</dt><dd>${C.a}</dd><dt>Link</dt><dd>${C.l}</dd><dt>Attributo</dt><dd>${ATTR_LABEL[C.at]}${BEATS[C.at]?`, forte contro ${ATTR_LABEL[BEATS[C.at]]}`:''}</dd><dt>Frecce</dt><dd>${C.ar.map(d=>DIR_IT[d]).join(', ')}</dd>${C.nx?'<dt>Tipo</dt><dd>senza effetto</dd>':''}</dl>`;
+  if(!inspMeasured) measureInspector(el);
+  el.innerHTML = inspected
+    ? `<div class="insp">${cardHTML(inspected, null, false)}${inspectorDL(inspected)}</div>`
+    : `<div class="insp"><span class="insp-empty"></span><div class="note" style="margin:0">${EMPTY_INSP}</div></div>`;
 }
+window.addEventListener('resize', () => { inspMeasured = false; if(state) renderInspector(); });
+if(document.fonts && document.fonts.ready) document.fonts.ready.then(() => { inspMeasured = false; if(state) renderInspector(); });
 function renderTools(){
   const st = state, el = $('tools'); let h = '';
-  if(mode==='local' && st.status!=='lobby') h += `<button class="btn" id="btnRotate">Gira il tavolo</button><button class="btn" id="btnFace" aria-pressed="${faceMode}">${faceMode?'Carte tutte nello stesso verso':'Carte verso chi le controlla'}</button>`;
-  if(mode==='online' && !online.host && !online.peersOnline) h += `<button class="btn primary" id="btnReconnect">Riconnetti</button>`;
-  if(mode==='online' && online.host && online.signal===false) h += `<button class="btn primary" id="btnResignal">Ricollega la stanza</button>`;
+  if(mode===Mode.LOCAL && st.status!=='lobby') h += `<button class="btn" id="btnRotate">Gira il tavolo</button><button class="btn" id="btnFace" aria-pressed="${faceMode}">${faceMode?'Carte tutte nello stesso verso':'Carte verso chi le controlla'}</button>`;
+  if(mode===Mode.ONLINE && !online.host && !online.peersOnline) h += `<button class="btn primary" id="btnReconnect">Riconnetti</button>`;
+  if(mode===Mode.ONLINE && online.host && online.signal===false) h += `<button class="btn primary" id="btnResignal">Ricollega la stanza</button>`;
   el.innerHTML = h;
 }
 
@@ -439,25 +493,33 @@ document.addEventListener('change', e=>{
 
 // ---------- local ----------
 function startLocal(){
-  mode = 'local'; mySeat = null; localView = 0; selHand = null; inspected = null; flash='';
+  mode = Mode.LOCAL; mySeat = null; localView = 0; selHand = null; inspected = null; flash='';
   faceMode = $('faceOpt').checked;
   state = {seq:0, status:'lobby', players:{s0:{deck:$('ld0').value}, s1:{deck:$('ld1').value}}};
   showGame(); startMatch();
 }
 function startMatch(){
   if(!state) return;
-  if(mode==='online' && !online.host) return;
+  if(mode===Mode.ONLINE && !online.host) return;
   const P = state.players; if(!P || !P.s0 || !P.s1) return;
   inspected = null;
   commit(st=>{ const g = newGame([P.s0.deck, P.s1.deck]); Object.assign(st, g); });
 }
-function showGame(){ $('menu').hidden = true; $('game').hidden = false; $('btnExit').hidden = false; }
+try{ history.scrollRestoration = 'manual'; }catch{}	// ricaricando la pagina il browser non rimette lo scorrimento di prima: si riparte dall'alto (se si rientra in una partita, showGame scorre al campo)
+window.scrollTo(0, 0);
+const scrollMode = () => matchMedia('(prefers-reduced-motion:reduce)').matches ? 'auto' : 'smooth';	// scorrimento fluido, immediato se le animazioni sono ridotte
+function showGame(){
+  const entering = $('game').hidden;	// può essere chiamata più volte: si scorre solo all'ingresso in partita
+  $('menu').hidden = true; $('game').hidden = false; $('btnExit').hidden = false;
+  if(entering) requestAnimationFrame(() => $('board').scrollIntoView({behavior: scrollMode(), block:'center'}));	// fino a centrare il campo (dopo il disegno, così le misure sono quelle finali)
+}
 function exitToMenu(){
-  if(mode==='online' && connected()) send({type:'bye'});
+  if(mode===Mode.ONLINE && connected()) send({type:'bye'});
   destroyPeer(online.conn ? 250 : 0);
   cancelPresent(); cancelFx(); setupSeq = -1; animSeq = -1;	// la prossima partita riparte da seq basso: le animazioni non vanno considerate già viste
   mode = null; state = null; mySeat = null; selHand = null;
   $('menu').hidden = false; $('game').hidden = true; $('btnExit').hidden = true; showResume();
+  requestAnimationFrame(() => window.scrollTo({top:0, behavior: scrollMode()}));	// tornando alla home si scorre fino in cima
   try{ history.replaceState(null, '', location.pathname + location.search); }catch{}
 }
 

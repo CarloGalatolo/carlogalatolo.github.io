@@ -363,3 +363,23 @@ test('mosse (ospite): lo stato dell\'host con force sostituisce quello locale an
   conn.emit('data', {type:'state', state: env.playState({turn:1, seq:10})});
   assert.equal(ctx.state.seq, 15, 'senza force uno stato più vecchio viene scartato');
 });
+
+// ============================================================ enum Mode
+test('Mode: valori, nome sbagliato che lancia un errore, enumerazione non modificabile', () => {
+  const env = createNetEnv();
+  assert.equal(env.run('Mode.LOCAL'), 'local'); assert.equal(env.run('Mode.ONLINE'), 'online');
+  assert.equal(env.run('Object.keys(Mode).join(",")'), 'LOCAL,ONLINE');
+  assert.throws(() => env.run('Mode.ONLIN'), /Mode\.ONLIN non esiste/, 'un refuso non diventa un silenzioso undefined');
+  assert.throws(() => env.run('Mode.LOCAL = "x"'), /enumerazione/);
+  assert.throws(() => env.run('Mode.NUOVO = "x"'), /enumerazione/);
+  assert.throws(() => env.run('delete Mode.LOCAL'), /enumerazione/);
+  assert.equal(env.run('Mode.LOCAL'), 'local', 'invariata dopo i tentativi di modifica');
+  assert.equal(env.run('JSON.stringify(Mode)'), '{"LOCAL":"local","ONLINE":"online"}', 'serializzabile (toJSON non dà errore)');
+});
+test('Mode: confronti con i valori stringa di prima continuano a funzionare', () => {
+  const env = createNetEnv();
+  env.ctx.mode = 'online';
+  assert.equal(env.run('mode === Mode.ONLINE'), true);
+  env.ctx.mode = null;
+  assert.equal(env.run('mode === Mode.ONLINE || mode === Mode.LOCAL'), false, 'null = menu');
+});

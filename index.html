@@ -11,198 +11,13 @@
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 </head>
 
-<style>
-:root{
-	color-scheme:light;
-	box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
-	--bg:#e7ebf3; --surface:#f8fafd; --raised:#ffffff; --ink:#16203a; --muted:#56627d; --line:#c3cce0; --cellbg:#d8dfec;
-	--p0:#b5620a; --p1:#2c53cc; --off:rgba(22,32,58,.14); --focus:#0a74e6; --danger:#b42318;
-	--fuoco:#f03317; --acqua:#0b3be6; --vento:#17c666; --terra:#966430; --luce:#ffd560; --oscurita:#7b46ad;
-	--cell:min(16.4vw, 92px);
-
-	/** Variabili delle animazioni **/
-	--lead:.25s;	/* Durata del drop e anticipo con cui si collegano le animazioni */
-	--spin-time:.5s;	/* Rotazione della carta catturata */
-	--atk-time:.4s;	/* Durata dell'affondo */
-	--reach:calc(var(--cell) * .15);	/* Spostamento dell'affondo */
-	--boost-time:.5s;	/* Durata aumento dell'ATK per vantaggio di Attributo */
-	--boost-hold:calc(var(--boost-time) + var(--atk-time));	/* il valore potenziato resta visibile fino alla fine dell'affondo */
-}
-@media (prefers-color-scheme:dark){
-:root:not([data-theme="light"]){
-	color-scheme:dark;
-	--bg:#0d1322; --surface:#172038; --raised:#1d2843; --ink:#e7ecf6; --muted:#9aa6c0; --line:#2c3858; --cellbg:#111a2e;
-	--p0:#f2a541; --p1:#83a0ff; --off:rgba(231,236,246,.15); --focus:#59a8ff; --danger:#ff7b6b;}
-}
-:root[data-theme="dark"]{
-	color-scheme:dark;
-	--bg:#0d1322; --surface:#172038; --raised:#1d2843; --ink:#e7ecf6; --muted:#9aa6c0; --line:#2c3858; --cellbg:#111a2e;
-	--p0:#f2a541; --p1:#83a0ff; --off:rgba(231,236,246,.15); --focus:#59a8ff; --danger:#ff7b6b;}
-*,*::before,*::after{box-sizing:inherit}
-html{scroll-padding-top:env(safe-area-inset-top,0px)}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:16px;line-height:1.45}
-button,select,input{font:inherit;color:inherit}
-button{cursor:pointer}
-:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
-.wrap{max-width:1120px;margin:0 auto;padding:16px}
-.top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:12px}
-.top h1{font-family:'Chakra Petch','Barlow',sans-serif;font-weight:700;font-size:1.7rem;margin:0;letter-spacing:.01em}
-.top .sub{color:var(--muted)}
-.top .spacer{flex:1}
-.btn{border:1px solid var(--line);background:var(--raised);border-radius:8px;padding:8px 14px;font-weight:600}
-.btn:hover{border-color:var(--ink)}
-.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.btn:disabled{opacity:.45;cursor:not-allowed}
-select,input[type=text]{border:1px solid var(--line);background:var(--raised);border-radius:8px;padding:8px 10px}
-input[type=text]{text-transform:uppercase;letter-spacing:.15em;width:8.5em;font-family:'Chakra Petch',monospace}
-/* menu */
-.menu{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(290px,1fr))}
-.menu section{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px}
-.menu h2{font-family:'Chakra Petch',sans-serif;font-size:1.2rem;margin:0 0 6px}
-.menu p{margin:0 0 14px;color:var(--muted);max-width:60ch}
-.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
-.row label{min-width:7.5em}
-.note{font-size:.92rem;color:var(--muted);margin-top:8px}
-.err{color:var(--danger);font-weight:600;margin-top:8px}
-.decklist{margin-top:16px;display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));align-items:start}	/* start: aprendo un mazzo l'altro resta alto quanto il suo titolo, non si stira */
-.decklist details{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 16px}
-.decklist summary{font-family:'Chakra Petch',sans-serif;font-weight:600;cursor:pointer}
-.minicards{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;--cell:68px}
-/* game */
-.game{display:grid;gap:14px 20px;grid-template-columns:auto minmax(260px,1fr);grid-template-rows:auto 1fr;grid-template-areas:"table status" "table panel";align-items:start}
-.game>#statusBox{grid-area:status}.game>.table{grid-area:table}.game>.panel{grid-area:panel}
-@media (max-width:820px){.game{grid-template-columns:1fr;grid-template-rows:auto;grid-template-areas:"status" "table" "panel"}.pinfo{font-size:.85rem}}
-.table{display:flex;flex-direction:column;align-items:center;gap:10px}
-.pinfo{display:flex;gap:10px;align-items:center;font-size:.95rem;width:100%;justify-content:space-between;max-width:calc(var(--cell)*5 + 1.3rem + 30px)}
-.pinfo .who{font-weight:600;display:flex;align-items:center;gap:8px}
-.pinfo .who::before{content:"";width:12px;height:12px;border-radius:3px;background:var(--pc)}
-.pinfo .who.turn{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px;text-decoration-color:var(--pc)}
-.pinfo .count{color:var(--muted)}
-.pinfo .big{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:1.3rem;color:var(--ink)}
-.hand{display:flex;gap:5px;min-height:var(--cell)}
-.slot{width:var(--cell);height:var(--cell);border-radius:10px;border:1px dashed var(--line)}
-.hcard{padding:0;border:0;background:none;border-radius:10px}
-.hcard.sel{transform:translateY(-8px)}
-.hand.bottom .hcard.sel{transform:translateY(-8px)}
-.hand.topside .hcard.sel{transform:translateY(8px)}
-.hcard.sel .card{box-shadow:0 0 0 3px var(--focus)}
-.board{display:grid;grid-template-columns:1.3rem repeat(5,var(--cell));grid-template-rows:1.2rem repeat(5,var(--cell));gap:5px;margin-left:-1.3rem;position:relative}
-.colpick{position:absolute;inset:0;padding:0;border:3px solid var(--focus);border-radius:12px;background:color-mix(in srgb,var(--focus) 8%,transparent);cursor:pointer;z-index:2}	/* bordo unico attorno a una colonna selezionabile (doppio 6) */
-.colpick:hover,.colpick:focus-visible{background:color-mix(in srgb,var(--focus) 20%,transparent)}
-.board .lab{display:flex;align-items:center;justify-content:center;font-family:'Chakra Petch',sans-serif;font-size:.8rem;color:var(--muted)}
-.cell{width:var(--cell);height:var(--cell);border-radius:10px;background:var(--cellbg);border:1px dashed var(--line);padding:0;position:relative}
-.cell.blocked{border-style:solid;background:repeating-linear-gradient(45deg,var(--line) 0 3px,var(--cellbg) 3px 10px);cursor:default}
-.cell.open{border:2px solid var(--focus);background:color-mix(in srgb,var(--focus) 10%,var(--cellbg))}
-.cell.has{border:0;background:none}
-.cell.target::after,.cell.attacker::after{content:'';position:absolute;inset:0;border-radius:10px;pointer-events:none}	/* anelli di selezione: sulla cella (non sulla carta) per poterli far comparire a tempo, vedi "selnew" */
-.cell.target::after{box-shadow:0 0 0 3px var(--focus),0 0 18px color-mix(in srgb,var(--focus) 60%,transparent)}
-.cell.attacker::after{box-shadow:0 0 0 3px var(--ink)}
-.cell.last .card{outline:2px dotted var(--ink);outline-offset:2px}
-/* card */
-.card{position:relative;width:var(--cell);height:var(--cell);border-radius:10px;background:var(--raised);border:2px solid var(--line);container-type:inline-size;overflow:hidden;color:var(--ink);text-align:center;display:block}
-.card.c0{--pc:var(--p0)}	/* --pc = colore del controllore attuale */
-.card.c1{--pc:var(--p1)}
-.card.c0,.card.c1{border-color:var(--pc);background:color-mix(in srgb,var(--pc) 14%,var(--raised))}
-.card svg{position:absolute;inset:0;width:100%;height:100%}
-.card svg.rot{transform:rotate(180deg)}
-.card.turned{--r:180deg;transform:rotate(180deg)}
-.pinfo.turned{transform:rotate(180deg)}
-.card polygon{fill:var(--off)}
-.card.c0 polygon.on,.card.c1 polygon.on{fill:var(--pc)}
-.card.cn polygon.on{fill:var(--ink)}
-.cbody{position:absolute;inset:12% 11%;display:flex;flex-direction:column;justify-content:space-between;align-items:stretch}
-.cname{font-size:10.5cqw;line-height:1.08;font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
-.catk{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:24cqw;line-height:1}
-.cmeta{display:flex;justify-content:space-between;align-items:center;font-family:'Chakra Petch',sans-serif;font-weight:600;font-size:10cqw}
-.adot{display:inline-block;width:11cqw;height:11cqw;border-radius:50%;background:var(--ac)}
-/* ===== Animazioni =====
-   Le avvia la sequenza JavaScript della mossa (sezione "sequenza di animazione" nello script) aggiungendo queste classi al momento giusto:
-   in CSS non ci sono ritardi. */
-.hcard{transition:transform .15s}	/* carta in mano: sollevamento quando è selezionata */
-.cell.target .card{animation:pulse 1s ease-in-out infinite alternate}	/* bersagli selezionabili */
-.board.selnew .cell.target::after,.board.selnew .cell.attacker::after{animation:selin .2s ease-out}	/* gli anelli di selezione compaiono con dissolvenza quando la sequenza li mostra */
-@property --atk-n{syntax:'<integer>';inherits:false;initial-value:0}	/* contatore animabile del valore ATK */
-.card.drop{animation:drop var(--lead) ease-out}	/* carta appena piazzata */
-.cell.blocked.fresh{animation:blockin .4s ease-out}	/* casella appena bloccata dai dadi */
-/* scossa del dado in corso di lancio: DISATTIVATA (togli il commento per riattivarla; i keyframes dieshake sono in fondo) */
-/* .die.rolling b{animation:dieshake .22s linear infinite} */
-/* affondo sulla cella (non sulla carta, così non confligge con la rotazione). --lx/--ly = direzione verso il bersaglio (misurata sullo schermo) */
-.cell.lunge{z-index:3;animation:lunge var(--atk-time) linear}
-/* aumento ATK per vantaggio di Attributo: il numero conta da --atk-from a --atk-to (contatore @property + counter(), perché il testo non si anima da solo),
-   si ingrandisce e si colora, resta così fino alla fine dell'affondo e poi torna al valore base */
-.catk.boost{--atk-n:var(--atk-from);counter-reset:atk var(--atk-n);color:transparent;position:relative;
-	animation:atkhold var(--boost-hold) linear,atkcount var(--boost-time) ease-out}
-.catk.boost::after{content:counter(atk);position:absolute;inset:0;color:var(--ink);
-	animation:boosthold var(--boost-hold) linear,boostpop var(--boost-time) ease-in-out}
-/* cattura: --d = verso (1 antiorario, -1 orario se la carta passa al Giocatore 2). Il colore e le frecce nuovi sono già applicati alla carta (setCardCtrl):
-   la rotazione parte dall'orientamento vecchio (180° di differenza) e arriva a quello nuovo */
-.card.spin{--d:1;animation:spin var(--spin-time) ease-in-out,lift var(--spin-time) ease-in-out;z-index:2}
-.card.spin.p1{--d:-1}
-.card.spin:not(.face) .cbody{animation:unspin var(--spin-time) ease-in-out}	/* nel modo normale il testo resta sempre dritto (ruotano solo bordo e frecce): contro-rotazione del corpo carta; in modalità "carte verso chi le controlla" (.face) il testo ruota con la carta */
-
-@media (prefers-reduced-motion:reduce){.card.spin,.card.spin .cbody,.card.drop,.cell.target .card,.board.selnew .cell.target::after,.board.selnew .cell.attacker::after,.cell.lunge,.catk.boost,.catk.boost::after,.cell.blocked.fresh,.die.rolling b{animation:none}.hcard{transition:none}}
-/* panel */
-.panel{display:flex;flex-direction:column;gap:14px}
-.box{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
-.box h3{font-family:'Chakra Petch',sans-serif;font-size:1rem;margin:0 0 8px}
-.status{font-size:1.05rem;font-weight:600}
-.status-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}	/* risultato a sinistra, pulsante a destra centrato in verticale; va a capo sugli schermi stretti */
-.status-text{flex:1 1 10em}
-.status-action{flex:none;margin-left:auto}	/* margin-left:auto: resta a destra anche quando va a capo */
-.status small{display:block;font-weight:400;color:var(--muted);font-size:.92rem;margin-top:4px}
-.dice{display:flex;gap:18px;align-items:center;margin:6px 0 10px}
-.die{display:flex;flex-direction:column;align-items:center;font-size:.8rem;color:var(--muted)}
-.die b{font-size:2.4rem;line-height:1;color:var(--dc,var(--ink));font-weight:400;display:inline-block}	/* --dc = colore del giocatore a cui appartiene il dado */
-.die small{font-size:.72rem;color:var(--dc,var(--muted));font-weight:600}
-.code{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:2rem;letter-spacing:.2em}
-.log{list-style:none;margin:0;padding:0;max-height:260px;overflow:auto;font-size:.9rem}
-.log li{padding:5px 0;border-bottom:1px solid var(--line)}
-.log li:first-child{font-weight:600}
-.insp{display:flex;gap:14px;align-items:center}
-.insp .card{--cell:104px;flex:none}
-.insp dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:.92rem}
-.insp dt{color:var(--muted)}
-.insp dd{margin:0}
-.rules{font-size:.92rem}
-.menu-rules{margin-top:16px}
-.resume{margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--cellbg)}
-.resume .row{margin-top:8px}
-.rules summary{font-family:'Chakra Petch',sans-serif;font-weight:600;cursor:pointer}
-.rules ul,.rules ol{padding-left:1.1em;margin:8px 0}
-.attrmap{display:block;width:100%;max-width:440px;height:auto;margin:6px 0}
-.am-line{stroke:var(--muted);stroke-width:1.8;stroke-linecap:round}
-.am-head{fill:var(--muted)}
-.am-node{fill:var(--raised);stroke-width:2}
-.am-text{fill:var(--ink);font-family:'Chakra Petch',sans-serif;font-weight:600;font-size:10.5px}
-.tools{display:flex;gap:8px;flex-wrap:wrap}
-.overlay{border:2px solid var(--pc);background:color-mix(in srgb,var(--pc) 10%,var(--surface))}
-.overlay .big{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:1.5rem}
-[hidden]{display:none!important}
-
-@keyframes pulse{to{transform:rotate(var(--r,0deg)) scale(1.05)}}
-@keyframes drop{from{transform:rotate(var(--r,0deg)) scale(1.15);opacity:.4}to{transform:rotate(var(--r,0deg)) scale(1);opacity:1}}
-@keyframes spin{from{rotate:calc(180deg * var(--d))}to{rotate:0deg}}
-@keyframes lift{50%{scale:1.12}}
-@keyframes atkcount{from{--atk-n:var(--atk-from)}to{--atk-n:var(--atk-to)}}	/* Aumento ATK */
-@keyframes atkhold{from,to{--atk-n:var(--atk-to)}}	/* Mantenimento del valore ATK aumentato */
-@keyframes boostpop{0%{scale:1;color:var(--ink)}55%{scale:1.5;color:var(--focus)}100%{scale:1.15;color:var(--focus)}}
-@keyframes boosthold{from,to{color:var(--focus);scale:1.15}}
-/* affondo: la carta si solleva e scatta verso il bersaglio (ease-in: accelera fino all'impatto a metà), poi torna al suo posto (ease-out) */
-@keyframes lunge{
-	0%{translate:0 0;scale:1;animation-timing-function:ease-in}
-	50%{translate:calc(var(--lx) * var(--reach)) calc(var(--ly) * var(--reach));scale:1.12;animation-timing-function:ease-out}
-	100%{translate:0 0;scale:1}}
-@keyframes blockin{from{scale:1.25;opacity:.3}to{scale:1;opacity:1}}
-@keyframes selin{from{opacity:0}}
-@keyframes dieshake{0%{rotate:-14deg;translate:0 1px}50%{rotate:12deg;translate:0 -2px}100%{rotate:-14deg;translate:0 1px}}
-@keyframes unspin{from{rotate:calc(-180deg * var(--d))}to{rotate:0deg}}
-</style>
+<link rel="stylesheet" href="style.css">
 
 <body>
 
 <div class="wrap">
   <header class="top">
-    <h1>Link Grid</h1><span class="sub">prototipo con le regole base</span>
+    <h1>YGO Link Grid</h1>
     <span class="spacer"></span>
     <button class="btn" id="btnExit" hidden>Torna al menu</button>
   </header>
@@ -227,10 +42,12 @@ input[type=text]{text-transform:uppercase;letter-spacing:.15em;width:8.5em;font-
 		<div class="err" id="menuErr" hidden></div>
 		<div class="note resume" id="resumeBox" hidden></div>
       </section>
-    </div>
-    <div class="box rules menu-rules" id="rulesSetup"></div>
-    <div class="box rules menu-rules" id="rulesMenu"></div>
-    <div class="decklist" id="deckPreview"></div>
+	</div>
+	<div class="rulesrow">
+		<div class="box rules" id="rulesMenu"></div>
+		<div class="box rules" id="rulesSetup"></div>
+	</div>
+	<div class="decklist" id="deckPreview"></div>
   </main>
 
   <main id="game" class="game" hidden>
@@ -244,7 +61,7 @@ input[type=text]{text-transform:uppercase;letter-spacing:.15em;width:8.5em;font-
     </section>
     <aside class="panel">
       <div class="box" id="extraBox" hidden></div>
-      <div class="box" id="inspBox"><h3>Carta selezionata</h3><div id="insp" class="note">Tocca una carta per vederne i dettagli.</div></div>
+      <div class="box" id="inspBox"><h3>Carta selezionata</h3><div id="insp" class="insp-stack"></div></div>
       <div class="tools" id="tools"></div>
       <div class="box rules" id="rulesGame"></div>
       <div class="box"><h3>Registro</h3><ol class="log" id="log"></ol></div>

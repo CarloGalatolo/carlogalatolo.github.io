@@ -1,5 +1,16 @@
 // Link Grid — parte online (PeerJS, connessione diretta tra browser): stanza, host/ospite, riconnessioni, passaggio dell'host, ripresa della stanza.
-// Usa lo stato dell'applicazione e le funzioni di script.js (state, mode, mySeat, render, commit, $…): si carica dopo engine.js e prima di script.js.
+// Usa lo stato dell'applicazione e le funzioni di graphics.js (state, mode, mySeat, render, commit, $…): si carica dopo engine.js e prima di graphics.js.
+// Modalità di gioco. Enum "stretta": i valori restano stringhe (leggibili nel debug), ma un nome sbagliato (Mode.ONLIN) lancia un errore
+// invece di diventare un silenzioso `undefined` che farebbe fallire ogni confronto. `mode` vale null quando si è nel menu, senza partita.
+function makeEnum(name, values){
+  const e = Object.freeze(Object.assign({}, values));
+  return new Proxy(e, {
+    get(t, k){ if(typeof k === 'string' && !(k in t) && k !== 'toJSON' && k !== 'then') throw new ReferenceError(`${name}.${k} non esiste (valori: ${Object.keys(t).join(', ')})`); return t[k]; },
+    set(t, k){ throw new TypeError(`${name} è un'enumerazione: ${String(k)} non si può modificare`); },
+    deleteProperty(t, k){ throw new TypeError(`${name} è un'enumerazione: ${String(k)} non si può eliminare`); }
+  });
+}
+const Mode = makeEnum('Mode', {LOCAL:'local', ONLINE:'online'});
 const online = {peer:null, conn:null, host:false, myId:null, code:null, deck:null, peersOnline:false, signal:null, lastSeen:0, watch:null, retry:0, joinTimer:0, joinTry:0, takeTimer:0, hostLeft:false, pendingState:null, awaiting:false, awaitTimer:0};	// signal = l'host è collegato al server che mette in contatto i giocatori (null = non applicabile)
 
 // ---------- online (PeerJS, connessione diretta tra browser) ----------
@@ -66,15 +77,15 @@ function linkLost(c, forceClose){
 }
 function scheduleTakeover(ms){
   clearTimeout(online.takeTimer);
-  if(online.host || mode!=='online' || !state) return;
-  online.takeTimer = setTimeout(()=>{ if(!online.host && mode==='online' && !connected()) becomeHost(); }, ms);
+  if(online.host || mode!==Mode.ONLINE || !state) return;
+  online.takeTimer = setTimeout(()=>{ if(!online.host && mode===Mode.ONLINE && !connected()) becomeHost(); }, ms);
 }
 // ===== passaggio dell'host =====
 // Il ruolo di host (chi tiene la stanza e lo stato) è separato dal posto di gioco: se l'host sparisce, l'ospite crea la stanza con lo stesso codice
 // tenendo il suo posto e il suo stato. Se l'altro torna, rientra come ospite (revertToGuest/joinAsGuest) e, se ha giocato nel frattempo, il suo stato
 // più recente viene adottato (adoptNewer). Il server dei codici garantisce un solo host per stanza: chi arriva secondo trova l'id occupato.
 function becomeHost(){
-  if(online.host || mode!=='online' || !state || !state.code) return;
+  if(online.host || mode!==Mode.ONLINE || !state || !state.code) return;
   clearTimeout(online.retry); clearTimeout(online.takeTimer);
   const code = state.code;
   if(state.status==='lobby'){	// sala d'attesa: chi resta diventa il Giocatore 1 della stanza (l'altro, se torna, entra come ospite)
@@ -121,8 +132,8 @@ function createRoom(tries=0, resume=null, restore=null, takeover=false){
   peer.on('open', ()=>{
     $('btnCreate').disabled = false; online.signal = true;
     // 'open' scatta anche quando il collegamento col server si ristabilisce dopo una caduta: la stanza (e l'eventuale partita) restano quelle, non si ricreano
-    if(mode==='online' && state && state.code===code){ if(!takeover) flash = ''; render(); return; }
-    mode = 'online'; mySeat = 0;
+    if(mode===Mode.ONLINE && state && state.code===code){ if(!takeover) flash = ''; render(); return; }
+    mode = Mode.ONLINE; mySeat = 0;
     if(restore){	// stanza ripresa dal salvataggio (vedi resumeRoom): stesso stato di prima, l'ospite si ricollega da solo
       state = structuredClone(restore); state.fx = null; state.sfx = null; state.seq = (state.seq||0) + 1;
       if(seatFromState()===null){ state.players = state.players || {}; state.players.s0 = {id:online.myId, deck:(state.players.s0 && state.players.s0.deck) || $('od').value}; }
@@ -134,32 +145,32 @@ function createRoom(tries=0, resume=null, restore=null, takeover=false){
     attach(code);
   });
   peer.on('connection', c=>hostAccept(c));
-  peer.on('disconnected', ()=>{ if(online.peer!==peer) return; online.signal = false; if(mode==='online' && state) render(); hostKeepSignal(peer); });
+  peer.on('disconnected', ()=>{ if(online.peer!==peer) return; online.signal = false; if(mode===Mode.ONLINE && state) render(); hostKeepSignal(peer); });
   peer.on('close', ()=>{	// il collegamento col server è stato chiuso del tutto (errore grave): si ricrea con lo stesso codice
-    if(online.peer!==peer || !online.host || mode!=='online') return;
+    if(online.peer!==peer || !online.host || mode!==Mode.ONLINE) return;
     online.signal = false; render();
-    setTimeout(()=>{ if(online.peer===peer && mode==='online') createRoom(0, code); }, 1500);
+    setTimeout(()=>{ if(online.peer===peer && mode===Mode.ONLINE) createRoom(0, code); }, 1500);
   });
   peer.on('error', err=>{
     if(online.peer!==peer) return;
     if(err.type==='unavailable-id'){
-      const established = mode==='online' && state && state.code===code;
+      const established = mode===Mode.ONLINE && state && state.code===code;
       if(resume || established){
         // L'id della stanza risulta occupato: o il server non ha ancora liberato quello vecchio (succede subito dopo aver chiuso la pagina), oppure
         // se l'è preso l'altro giocatore (passaggio dell'host). Dopo qualche tentativo ci si prova a collegare come ospite: se c'è già un host risponde.
         if(tries>=3){
-          if(mode==='online') revertToGuest();
+          if(mode===Mode.ONLINE) revertToGuest();
           else if(restore) joinAsGuest(code, restore);
           return;
         }
-        if(mode!=='online') $('onlineNote').textContent = 'Riprendo la stanza: il server la sta ancora liberando, riprovo…';
-        setTimeout(()=>{ if(online.peer===peer && (mode==='online' || restore)) createRoom(tries+1, code, restore, takeover); }, 3000);
+        if(mode!==Mode.ONLINE) $('onlineNote').textContent = 'Riprendo la stanza: il server la sta ancora liberando, riprovo…';
+        setTimeout(()=>{ if(online.peer===peer && (mode===Mode.ONLINE || restore)) createRoom(tries+1, code, restore, takeover); }, 3000);
         return;
       }
       if(tries<4) return createRoom(tries+1);
     }
     $('btnCreate').disabled = false;
-    if(mode!=='online'){ menuError(peerErrorText(err)); destroyPeer(); }
+    if(mode!==Mode.ONLINE){ menuError(peerErrorText(err)); destroyPeer(); }
     else { flash = peerErrorText(err); render(); }
   });
 }
@@ -238,13 +249,13 @@ function guestConnect(){
     if(msg.type==='ping'){ try{ c.send({type:'pong'}); }catch{} return; }
     if(msg.type==='pong') return;
     if(msg.type==='bye'){ online.hostLeft = true; scheduleTakeover(1500); return; }	// l'host se ne va di proposito: la sua stanza passa a me appena la connessione si chiude
-    if(msg.type==='full'){ $('btnJoin').disabled = false; $('onlineNote').textContent = ONLINE_NOTE; destroyPeer(); if(mode==='online') exitToMenu(); menuError('La stanza è già piena.'); return; }
+    if(msg.type==='full'){ $('btnJoin').disabled = false; $('onlineNote').textContent = ONLINE_NOTE; destroyPeer(); if(mode===Mode.ONLINE) exitToMenu(); menuError('La stanza è già piena.'); return; }
     if(msg.type==='state' && msg.state){
       gotState = true; clearInterval(helloTimer); online.joinTry = 0; clearTimeout(online.retry); clearTimeout(online.takeTimer);
       online.hostLeft = false; online.pendingState = null;
-      const first = mode!=='online';
+      const first = mode!==Mode.ONLINE;
       $('btnJoin').disabled = false; $('onlineNote').textContent = ONLINE_NOTE;
-      if(first){ mode = 'online'; state = null; }
+      if(first){ mode = Mode.ONLINE; state = null; }
       flash = '';
       applyRemote(msg.state, !!msg.force);
       if(first){ storeSaved(GUEST_KEY, {code:online.code, id:online.myId}); attach(online.code); }
@@ -254,7 +265,7 @@ function guestConnect(){
   c.on('close', ()=>{
     clearTimeout(timer); clearInterval(helloTimer);
     if(c!==online.conn) return;
-    if(mode!=='online'){ online.conn = null; online.peersOnline = false; joinFailed('La connessione con la stanza si è interrotta.'); return; }
+    if(mode!==Mode.ONLINE){ online.conn = null; online.peersOnline = false; joinFailed('La connessione con la stanza si è interrotta.'); return; }
     linkLost(c);
   });
   c.on('error', ()=>{});
@@ -275,14 +286,14 @@ function applyRemote(d, force){
 // La connessione con l'altro giocatore è caduta (chiusa, o senza risposte): l'host libera il posto in sala d'attesa, l'ospite prova a ricollegarsi da solo
 function scheduleGuestReconnect(n=0){	// l'ospite riprova da solo, con pause crescenti, finché non è di nuovo collegato
   clearTimeout(online.retry);
-  if(online.host || mode!=='online' || connected() || n>=60) return;
+  if(online.host || mode!==Mode.ONLINE || connected() || n>=60) return;
   online.retry = setTimeout(()=>{
-    if(online.host || mode!=='online' || connected()) return;
+    if(online.host || mode!==Mode.ONLINE || connected()) return;
     reconnect(); scheduleGuestReconnect(n+1);
   }, Math.min(2000 + n*1000, 8000));
 }
 function netWake(){	// la scheda torna visibile o la rete torna disponibile: si ricollega subito invece di aspettare il prossimo tentativo
-  if(mode!=='online') return;
+  if(mode!==Mode.ONLINE) return;
   if(online.host){ if(online.peer && online.peer.disconnected && !online.peer.destroyed) hostKeepSignal(online.peer); }
   else if(!connected()) reconnect();
 }
@@ -294,13 +305,13 @@ function hostKeepSignal(peer, n=0){	// ricollega l'host al server finché non ci
 }
 // ===== ospite =====
 function joinFailed(why){	// prima connessione fallita: riprova da solo qualche volta prima di arrendersi (l'host potrebbe essere in fase di ricollegamento al server)
-  if(mode==='online'){ flash = why; render(); scheduleGuestReconnect(); return; }
+  if(mode===Mode.ONLINE){ flash = why; render(); scheduleGuestReconnect(); return; }
   const peer = online.peer;
   online.joinTry = (online.joinTry||0) + 1;
   if(peer && !peer.destroyed && online.joinTry < JOIN_TRIES){
     $('onlineNote').textContent = `Non trovo ancora la stanza: riprovo (tentativo ${online.joinTry+1} di ${JOIN_TRIES})…`;
     clearTimeout(online.joinTimer);
-    online.joinTimer = setTimeout(()=>{ if(mode!=='online' && online.peer===peer) guestConnect(); }, 2500);
+    online.joinTimer = setTimeout(()=>{ if(mode!==Mode.ONLINE && online.peer===peer) guestConnect(); }, 2500);
     return;
   }
   $('btnJoin').disabled = false; $('onlineNote').textContent = ONLINE_NOTE;
@@ -323,7 +334,7 @@ function joinRoom(){
   peer.on('disconnected', ()=>{ if(online.peer===peer && !peer.destroyed) setTimeout(()=>{ try{ peer.reconnect(); }catch{} }, 1500); });
   peer.on('error', err=>{
     if(online.peer!==peer) return;
-    if(mode!=='online'){
+    if(mode!==Mode.ONLINE){
       if(err.type==='peer-unavailable') return joinFailed(peerErrorText(err));
       $('btnJoin').disabled = false; $('onlineNote').textContent = ONLINE_NOTE;
       menuError(peerErrorText(err)); destroyPeer(); return;
@@ -350,7 +361,7 @@ function loadSaved(key){ try{ const v = JSON.parse(localStorage.getItem(key)); r
 function storeSaved(key, v){ try{ localStorage.setItem(key, JSON.stringify(Object.assign({at:Date.now()}, v))); }catch{} }
 let savedSeq = -1;
 function saveRoom(){	// l'host salva la stanza a ogni cambiamento di stato (la tiene solo lui): così può riprenderla anche dopo una chiusura o un ricaricamento
-  if(mode!=='online' || !online.host || !state || !state.code || (state.seq||0)===savedSeq) return;
+  if(mode!==Mode.ONLINE || !online.host || !state || !state.code || (state.seq||0)===savedSeq) return;
   savedSeq = state.seq||0;
   const copy = Object.assign({}, state); delete copy.fx; delete copy.sfx;
   storeSaved(ROOM_KEY, {code:state.code, hostId:online.myId, state:copy});
@@ -394,7 +405,7 @@ function pushOnline(st){
 }
 function guardOnlineAction(){
   // Il giocatore ospite non può muovere senza connessione: l’host tiene la partita.
-  if(mode==='online' && !online.host && !connected()){ flash = 'Connessione con l’host persa. Usa “Riconnetti” per rientrare.'; render(); return false; }
+  if(mode===Mode.ONLINE && !online.host && !connected()){ flash = 'Connessione con l’host persa. Usa “Riconnetti” per rientrare.'; render(); return false; }
   return true;
 }
 function lobbyUpdate(patch){

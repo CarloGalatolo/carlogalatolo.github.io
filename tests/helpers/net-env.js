@@ -1,6 +1,6 @@
 'use strict';
 // Ambiente per testare net.js senza browser né rete: carica i file veri (engine.js e net.js) in un contesto isolato, con un "browser finto"
-// (PeerJS, timer, localStorage, DOM minimo) e quello che net.js si aspetta da script.js (state, mode, render, commit…).
+// (PeerJS, timer, localStorage, DOM minimo) e quello che net.js si aspetta da graphics.js (state, mode, render, commit…).
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
@@ -49,7 +49,7 @@ function pending(pred){ return timeouts.some(x => !x.done && pred(x)); }
 function lastPeer(){ return peers[peers.length - 1]; }
 `;
 
-// Copia semplificata di commit() di script.js (l'originale disegna anche l'interfaccia): applica fn a una copia dello stato, alza seq e, online, lo invia.
+// Copia semplificata di commit() di graphics.js (l'originale disegna anche l'interfaccia): applica fn a una copia dello stato, alza seq e, online, lo invia.
 const COMMIT = `
 function commit(fn){
   if(!state) return;
@@ -73,6 +73,7 @@ function createNetEnv(){
   vm.runInContext('var __online = online; var __C = {TAKEOVER_MS, JOIN_TRIES, PING_MS, DEAD_MS, ONLINE_NOTE, ROOM_KEY, GUEST_KEY};', ctx);
   const env = {ctx, online: ctx.__online, C: ctx.__C};
   env.online.myId = 'host-1';
+  env.run = code => vm.runInContext(code, ctx);   // valuta un'espressione nel contesto (per ciò che è `const`, come Mode)
   env.peers = ctx.peers;
   env.lastPeer = () => ctx.peers[ctx.peers.length - 1];
   env.fire = pred => ctx.fire(pred);

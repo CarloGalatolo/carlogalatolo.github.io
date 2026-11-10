@@ -1,22 +1,22 @@
 'use strict';
-// Controlli sulla struttura del progetto: i tre script (engine.js, net.js, script.js) sono script classici che condividono lo stesso ambito globale nel
+// Controlli sulla struttura del progetto: i tre script (engine.js, net.js, graphics.js) sono script classici che condividono lo stesso ambito globale nel
 // browser, quindi devono essere caricati nell'ordine giusto, non dichiarare gli stessi nomi e non avere dipendenze nascoste.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const {read} = require('./helpers/net-env.js');
 
-const FILES = ['engine.js', 'net.js', 'script.js'];
+const FILES = ['engine.js', 'net.js', 'graphics.js'];
 
 test('i file JavaScript hanno una sintassi valida', () => {
   for(const f of FILES) assert.doesNotThrow(() => new vm.Script(read(f), {filename: f}), f);
 });
-test('index.html carica engine.js, net.js e script.js in quest\'ordine, dopo PeerJS', () => {
+test('index.html carica engine.js, net.js e graphics.js in quest\'ordine, dopo PeerJS', () => {
   const html = read('index.html');
   const srcs = [...html.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)].map(m => m[1]);
   const idx = f => srcs.findIndex(s => s.endsWith(f));
   assert.ok(idx('peerjs.min.js') >= 0 && idx('peerjs.min.js') < idx('engine.js'), 'PeerJS prima degli script del gioco');
-  assert.ok(idx('engine.js') >= 0 && idx('engine.js') < idx('net.js') && idx('net.js') < idx('script.js'), 'ordine: ' + srcs.join(', '));
+  assert.ok(idx('engine.js') >= 0 && idx('engine.js') < idx('net.js') && idx('net.js') < idx('graphics.js'), 'ordine: ' + srcs.join(', '));
   assert.ok(!/<script>[\s\S]*?\S[\s\S]*?<\/script>/.test(html), 'nessuno script inline rimasto in index.html');
 });
 test('nessun nome di primo livello è dichiarato in più di un file (in un browser sarebbe un errore)', () => {
@@ -36,9 +36,16 @@ test('il motore non tocca il browser: niente DOM, rete o archiviazione', () => {
   for(const forbidden of ['document.', 'window.', 'localStorage', 'sessionStorage', 'Peer(', 'setTimeout', 'setInterval', 'fetch(', 'location.'])
     assert.ok(!src.includes(forbidden), 'engine.js usa ' + forbidden);
 });
-test('net.js non esegue nulla al caricamento (solo dichiarazioni): dipende da script.js solo a partita avviata', () => {
+test('net.js non esegue nulla al caricamento (solo dichiarazioni): dipende da graphics.js solo a partita avviata', () => {
   // si carica in un contesto vuoto: se toccasse state, render, $ ecc. al caricamento lancerebbe un errore
   const ctx = vm.createContext({structuredClone, console});
   vm.runInContext(read('engine.js'), ctx);
   assert.doesNotThrow(() => vm.runInContext(read('net.js'), ctx));
+});
+
+test('la modalità di gioco si confronta sempre con l\'enum Mode, mai con stringhe scritte a mano', () => {
+  for(const f of ['net.js', 'graphics.js']){
+    const bad = read(f).split('\n').map((l, i) => [i + 1, l]).filter(([, l]) => /\bmode\s*(===|!==|=)\s*'(local|online)'/.test(l));
+    assert.deepEqual(bad, [], f + ': ' + bad.map(([n, l]) => n + ': ' + l.trim().slice(0, 60)).join(' | '));
+  }
 });

@@ -17,7 +17,7 @@ Nessuna build: i file si caricano direttamente dal browser (GitHub Pages) come s
 |---|---|
 | `engine.js` | Regole del gioco: carte, mazzi, preparazione del campo, catture, combo, fine partita, validazione delle mosse (`applyMove`) e testi del registro. Funzioni pure su uno stato JSON: non toccano né il DOM né la rete, e in Node si caricano con `require`. |
 | `net.js` | Parte online (PeerJS, connessione diretta tra browser): stanza, host e ospite, riconnessioni, passaggio dell'host, ripresa della stanza. |
-| `script.js` | Interfaccia: disegno, animazioni, eventi, partita locale. |
+| `graphics.js` | Interfaccia: disegno, animazioni, eventi, partita locale. |
 
 **Gioco online.** L'host tiene lo stato e il motore. L'ospite non manda mai uno stato: manda solo la mossa (`{t:'place', hi, i}`, `{t:'target', i}`, `{t:'setup', k}`), l'host la valida con `applyMove`, la applica e rimanda lo stato aggiornato.
 
