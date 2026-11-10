@@ -42,7 +42,7 @@ test('host: collegamento col server chiuso del tutto -> stanza ricreata con lo s
   assert.equal(env.peers.length, before + 1);
   assert.equal(ctx.state.code, code); assert.equal(ctx.state.players.s1.id, 'guest-4');
 });
-test('host: posto dell\'ospite — si libera in sala d\'attesa, un altro può entrare, un terzo viene respinto, lo stesso ospite lo riprende', () => {
+test('host: posto dell\'ospite — si libera in sala d\'attesa, un altro può entrare, un terzo diventa spettatore, lo stesso ospite lo riprende', () => {
   const env = createNetEnv(), {ctx, online} = env;
   const peer = env.hostRoom();
   const c1 = env.guestHello(peer, 'guest-1');
@@ -52,7 +52,8 @@ test('host: posto dell\'ospite — si libera in sala d\'attesa, un altro può en
   const c2 = env.guestHello(peer, 'guest-2', 'tramonto');
   assert.equal(ctx.state.players.s1.id, 'guest-2'); assert.equal(online.conn, c2);
   const c3 = env.guestHello(peer, 'guest-3');
-  assert.ok(c3.sent.some(m => m.type === 'full'), 'terzo ospite respinto con "stanza piena"');
+  assert.ok(c3.sent.some(m => m.type === 'state' && m.spec === true), 'il terzo guarda come spettatore (non viene respinto)');
+  assert.ok(!c3.sent.some(m => m.type === 'full')); assert.equal(online.specs.size, 1); assert.notEqual(online.conn, c3);
   assert.equal(ctx.state.players.s1.id, 'guest-2');
   const c2b = env.guestHello(peer, 'guest-2', 'tramonto');
   assert.equal(online.conn, c2b); assert.ok(!c2b.sent.some(m => m.type === 'full'), 'lo stesso ospite riprende il suo posto');
@@ -172,7 +173,8 @@ test('ripresa: un posto lasciato si può riprendere a partita iniziata; il mazzo
   assert.equal(ctx.state.players.s1.id, 'guest-NEW', 'posto lasciato: riprendibile');
   assert.equal(ctx.state.players.s1.deck, 'tramonto', 'il mazzo del posto non cambia a partita iniziata');
   const c3 = env.guestHello(peer, 'guest-3');
-  assert.ok(c3.sent.some(m => m.type === 'full'), 'posto occupato da uno collegato: respinto'); assert.equal(online.conn, cn);
+  assert.ok(c3.sent.some(m => m.type === 'state' && m.spec === true), 'posto occupato da uno collegato: si guarda soltanto'); assert.equal(online.conn, cn);
+  assert.equal(ctx.state.players.s1.id, 'guest-NEW', 'lo spettatore non ha preso il posto');
   ctx.saveRoom(); ctx.forgetRoom();
   assert.equal(ctx.localStorage.getItem('linkgrid-room'), null); assert.equal(ctx.$('resumeBox').hidden, true);
   ctx.localStorage.setItem('linkgrid-room', JSON.stringify({at: ctx.fakeNow - 25 * 3600 * 1000, code:'OLD11', hostId:'x', state:{status:'play'}}));
@@ -382,4 +384,144 @@ test('Mode: confronti con i valori stringa di prima continuano a funzionare', ()
   assert.equal(env.run('mode === Mode.ONLINE'), true);
   env.ctx.mode = null;
   assert.equal(env.run('mode === Mode.ONLINE || mode === Mode.LOCAL'), false, 'null = menu');
+});
+
+
+// ============================================================ spettatori
+const specHello = (env, peer, id, spectate = true) => { const c = env.conn(); peer.emit('connection', c); c.emit('data', {type:'hello', id, deck:'alba', state:null, spectate}); return c; };
+const msgs = (c, type) => c.sent.filter(m => m.type === type);
+
+test('spettatori (host): la casella "spettatore" fa guardare anche con un posto libero, senza occuparlo', () => {
+  const env = createNetEnv(), {ctx, online} = env;
+  const peer = env.hostRoom();
+  const cs = specHello(env, peer, 'spec-1');
+  assert.equal(online.specs.size, 1); assert.equal(online.conn, null); assert.equal(ctx.state.players.s1, null, 'il posto resta libero');
+  const st = msgs(cs, 'state')[0]; assert.ok(st && st.spec === true && st.force === true && st.state.code === ctx.state.code);
+  const g = env.guestHello(peer, 'guest-1');   // un giocatore arriva dopo: prende il posto e lo spettatore lo vede
+  assert.equal(ctx.state.players.s1.id, 'guest-1'); assert.equal(online.conn, g);
+  assert.equal(msgs(cs, 'state').pop().state.players.s1.id, 'guest-1');
+});
+test('spettatori (host): uno spettatore non può muovere né imporre nulla', () => {
+  const env = createNetEnv(), {ctx, online} = env;
+  const peer = env.hostRoom();
+  const g = env.guestHello(peer, 'guest-1');
+  ctx.state = env.playState({turn:1}); ctx.state.code = ctx.state.code;
+  const cs = specHello(env, peer, 'spec-1');
+  const before = JSON.stringify(ctx.state);
+  cs.emit('data', {type:'move', move:{t:'place', hi:0, i:0}, seq: ctx.state.seq});
+  cs.emit('data', {type:'state', state:{seq:999}}); cs.emit('data', {type:'deck', deck:'alba'});
+  assert.equal(JSON.stringify(ctx.state), before, 'stato invariato'); assert.equal(online.conn, g);
+});
+test('spettatori (host): le mosse del giocatore arrivano anche agli spettatori; presenza e numero si aggiornano', () => {
+  const env = createNetEnv(), {ctx, online} = env;
+  const peer = env.hostRoom();
+  const g = env.guestHello(peer, 'guest-1');
+  ctx.state = env.playState({turn:1}); ctx.state.code = ctx.state.code; ctx.state.players = {s0:{id:'host-1', deck:'alba'}, s1:{id:'guest-1', deck:'tramonto'}};
+  const cs = specHello(env, peer, 'spec-1');
+  const p0 = msgs(cs, 'presence').pop(); assert.deepEqual(Array.from(p0.on), [true, true]); assert.equal(p0.specs, 1);
+  const n = msgs(cs, 'state').length;
+  g.emit('data', {type:'move', move:{t:'place', hi:0, i:0}, seq: ctx.state.seq});
+  assert.equal(msgs(cs, 'state').length, n + 1, 'lo stato dopo la mossa arriva allo spettatore');
+  g.close();   // il giocatore cade
+  assert.deepEqual(Array.from(msgs(cs, 'presence').pop().on), [true, false]);
+  cs.close(); assert.equal(online.specs.size, 0);
+});
+test('spettatori (host): un giocatore già seduto che spunta "spettatore" riprende comunque il suo posto', () => {
+  const env = createNetEnv(), {ctx, online} = env;
+  const peer = env.hostRoom();
+  const g = env.guestHello(peer, 'guest-1');
+  const st = env.playState({turn:0}); st.code = ctx.state.code; ctx.state = st; ctx.state.players = {s0:{id:'host-1', deck:'alba'}, s1:{id:'guest-1', deck:'tramonto'}};
+  g.close();   // a partita iniziata il posto resta suo
+  const g2 = specHello(env, peer, 'guest-1', true);
+  assert.equal(online.conn, g2); assert.equal(online.specs.size, 0);
+});
+test('spettatori (host): al massimo MAX spettatori; lo stesso spettatore che rientra sostituisce la vecchia connessione', () => {
+  const env = createNetEnv(), {online} = env;
+  const peer = env.hostRoom();
+  const first = specHello(env, peer, 'spec-0');
+  for(let i = 1; i < 8; i++) specHello(env, peer, 'spec-' + i);
+  assert.equal(online.specs.size, 8);
+  const extra = specHello(env, peer, 'spec-X'); assert.ok(msgs(extra, 'full').length, 'oltre il limite: stanza piena'); assert.equal(online.specs.size, 8);
+  const again = specHello(env, peer, 'spec-0');
+  assert.equal(online.specs.size, 8); assert.equal(first.open, false, 'vecchia connessione chiusa'); assert.ok(online.specs.has(again));
+});
+test('spettatori (host): uno spettatore che non dà più segni di vita viene tolto', () => {
+  const env = createNetEnv(), {ctx, online, C} = env;
+  const peer = env.hostRoom(); ctx.startNetWatch();
+  const cs = specHello(env, peer, 'spec-1');
+  cs.emit('data', {type:'ping'}); assert.ok(msgs(cs, 'pong').length);
+  ctx.fakeNow += C.DEAD_MS + 1000; ctx.intervals.forEach(f => f());
+  assert.equal(online.specs.size, 0); assert.equal(cs.open, false);
+});
+test('spettatori (host): uscendo avvisa gli spettatori: "bye" se c\'è un altro giocatore, "closed" se la stanza resta vuota', () => {
+  let env = createNetEnv(), {ctx} = env;
+  let peer = env.hostRoom(); env.guestHello(peer, 'guest-1');
+  let cs = specHello(env, peer, 'spec-1'); ctx.leaveRoom();
+  assert.ok(msgs(cs, 'bye').length && !msgs(cs, 'closed').length);
+  env = createNetEnv(); ctx = env.ctx; peer = env.hostRoom();
+  cs = specHello(env, peer, 'spec-1'); ctx.leaveRoom();
+  assert.ok(msgs(cs, 'closed').length, 'nessun altro giocatore: la stanza è finita');
+});
+test('spettatori (ospite): la casella fa mandare "spectate", e lo stato con spec:true rende spettatori (senza posto)', () => {
+  const env = createNetEnv(), {ctx, online} = env;
+  ctx.$('specOpt').checked = true; ctx.$('joinCode').value = 'ROOMX';
+  ctx.joinRoom();
+  assert.equal(online.spec, true);
+  online.myId = 'spec-1';
+  const peer = env.lastPeer(); peer.emit('open');
+  const c = peer.conns[peer.conns.length - 1]; c.open = true; c.emit('open');
+  assert.equal(c.sent[0].type, 'hello'); assert.equal(c.sent[0].spectate, true); assert.equal(c.sent[0].state, null);
+  const st = env.playState({turn:0}); st.code = 'ROOMX';
+  c.emit('data', {type:'state', state:st, force:true, spec:true});
+  assert.equal(ctx.mode, 'online'); assert.equal(ctx.mySeat, null); assert.equal(online.spec, true);
+  ctx.sendMove({t:'place', hi:0, i:0}); assert.ok(!c.sent.some(m => m.type === 'move'), 'uno spettatore non invia mosse');
+  c.emit('data', {type:'presence', on:[true, false], specs:2}); assert.deepEqual(Array.from(online.presence.on), [true, false]); assert.equal(online.presence.specs, 2);
+});
+test('spettatori (ospite): stanza piena senza spettatori liberi -> errore chiaro; senza la casella, un posto occupato porta a guardare', () => {
+  const env = createNetEnv();
+  env.ctx.$('joinCode').value = 'ROOMX'; env.ctx.joinRoom();
+  assert.equal(env.online.spec, false);
+  const peer = env.lastPeer(); peer.emit('open');
+  const c = peer.conns[peer.conns.length - 1]; c.open = true; c.emit('open');
+  c.emit('data', {type:'full'});
+  assert.match(env.ctx.$('menuErr').textContent, /piena/);
+});
+test('spettatori (ospite): se l\'host sparisce NON diventa host; aspetta, poi la stanza si considera chiusa', () => {
+  const env = createNetEnv(), {ctx, online, C} = env;
+  const {conn} = env.asGuest(env.playState({turn:0}));
+  ctx.mySeat = null; online.spec = true; ctx.state.players = {s0:{id:'host-1', deck:'alba'}, s1:{id:'guest-A', deck:'tramonto'}};
+  online.myId = 'spec-1'; ctx.mySeat = ctx.seatFromState();
+  conn.close();
+  assert.equal(online.host, false); assert.ok(!env.pending(t => t.ms === C.TAKEOVER_MS), 'nessun passaggio di host');
+  assert.ok(env.pending(t => t.ms === C.SPEC_CLOSE_MS), 'ma parte il conto alla rovescia della chiusura');
+  assert.match(ctx.flash, /ricollegarmi/);
+  env.fire(t => t.ms === C.SPEC_CLOSE_MS);
+  assert.equal(ctx.mode, null, 'tornato al menu'); assert.match(ctx.$('menuErr').textContent, /chiusa/);
+});
+test('spettatori (ospite): se la stanza torna (l\'altro giocatore ne è diventato l\'host) il conto alla rovescia si annulla', () => {
+  const env = createNetEnv(), {ctx, online, C} = env;
+  const {peer, conn} = env.asGuest(env.playState({turn:0}));
+  online.spec = true; online.myId = 'spec-1'; ctx.mySeat = null;
+  conn.close(); assert.ok(env.pending(t => t.ms === C.SPEC_CLOSE_MS));
+  const c2 = peer.conns[peer.conns.length - 1]; ctx.guestConnect(); const nc = peer.conns[peer.conns.length - 1]; nc.open = true; nc.emit('open');
+  const st = env.playState({turn:0}); st.seq = 11;
+  nc.emit('data', {type:'state', state:st, force:true, spec:true});
+  assert.equal(online.specTimer, 0); assert.ok(!env.pending(t => t.ms === C.SPEC_CLOSE_MS), 'annullato'); assert.equal(ctx.mode, 'online');
+});
+test('spettatori (ospite): "closed" dell\'host -> si torna al menu con un messaggio; "bye" -> si aspetta', () => {
+  let env = createNetEnv(); let g = env.asGuest(env.playState({turn:0}));
+  env.online.spec = true;
+  g.conn.emit('data', {type:'bye'}); assert.equal(env.ctx.mode, 'online'); assert.ok(!env.pending(t => t.ms === env.C.TAKEOVER_MS), 'nessun takeover');
+  g.conn.emit('data', {type:'closed'});
+  assert.equal(env.ctx.mode, null); assert.match(env.ctx.$('menuErr').textContent, /chiusa/);
+});
+test('spettatori: dopo il passaggio di host, lo spettatore si ricollega al nuovo host e viene accettato', () => {
+  // l'ospite G prende il posto dell'host; lo spettatore si ricollega con spectate:true e G lo accetta come spettatore
+  const env = createNetEnv(), {ctx, online, C} = env;
+  const {conn} = env.asGuest(env.playState({turn:0}));
+  conn.close(); env.fire(t => t.ms === C.TAKEOVER_MS);
+  const hp = env.lastPeer(); hp.emit('open');
+  assert.equal(online.host, true); assert.equal(online.specs.size, 0);
+  const cs = specHello(env, hp, 'spec-1');
+  assert.equal(online.specs.size, 1); assert.ok(msgs(cs, 'state').some(m => m.spec === true));
 });

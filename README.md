@@ -1,4 +1,4 @@
-# carlogalatolo.github.io
+# YGO Link Grid
 
 Questo è un simulatore per browser di un minigioco di mia creazione che prende regole dal Tetra Master di Final Fantasy 9 e le porta sul tavolo usando le carte mostro Link di YGO.
 
@@ -9,28 +9,6 @@ Può essere giocato interamente dal vivo disponendo dei seguenti materiali:
 
 Il codice del simulatore è al 99% scritto dall'IA.
 
-## Struttura del codice
-
-Nessuna build: i file si caricano direttamente dal browser (GitHub Pages) come script classici, nell'ordine indicato in `index.html`.
-
-| File | Contenuto |
-|---|---|
-| `engine.js` | Regole del gioco: carte, mazzi, preparazione del campo, catture, combo, fine partita, validazione delle mosse (`applyMove`) e testi del registro. Funzioni pure su uno stato JSON: non toccano né il DOM né la rete, e in Node si caricano con `require`. |
-| `net.js` | Parte online (PeerJS, connessione diretta tra browser): stanza, host e ospite, riconnessioni, passaggio dell'host, ripresa della stanza. |
-| `graphics.js` | Interfaccia: disegno, animazioni, eventi, partita locale. |
-
 **Gioco online.** L'host tiene lo stato e il motore. L'ospite non manda mai uno stato: manda solo la mossa (`{t:'place', hi, i}`, `{t:'target', i}`, `{t:'setup', k}`), l'host la valida con `applyMove`, la applica e rimanda lo stato aggiornato.
 
-## Test
-
-Servono solo Node (versione 20 o successiva), nessuna dipendenza da installare:
-
-```
-npm test
-```
-
-- `tests/engine.test.js`: regole, preparazione del campo, mosse non valide, partite casuali con controllo degli invarianti, dati dei mazzi.
-- `tests/net.test.js`: parte online con un PeerJS finto (host, ospite, riconnessioni, ripresa della stanza, passaggio dell'host, protocollo a mosse).
-- `tests/files.test.js`: struttura dei file (ordine degli script, nomi duplicati, motore senza accessi al browser).
-
-Nei test le carte sono inventate e i dadi si possono pilotare (`setRng`), quindi non dipendono dai dati dei mazzi né dal caso.
+**Spettatori.** Chi entra in una stanza già piena (o spunta "Entra come spettatore") guarda soltanto: l'host gli manda ogni stato (`spec:true`) e un messaggio `presence` (chi è collegato, quanti spettatori), ma non accetta nulla da lui. Gli spettatori non hanno un posto e non diventano mai host: se l'host sparisce si ricollegano alla stanza (la riapre l'altro giocatore) e, se non torna nessuno entro un minuto (o l'host esce senza altri giocatori: messaggio `closed`), la considerano chiusa. Massimo 8 spettatori.

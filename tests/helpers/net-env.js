@@ -70,7 +70,7 @@ function createNetEnv(){
   vm.runInContext(read('engine.js'), ctx, {filename: 'engine.js'});
   vm.runInContext(COMMIT, ctx, {filename: 'commit'});
   vm.runInContext(read('net.js'), ctx, {filename: 'net.js'});
-  vm.runInContext('var __online = online; var __C = {TAKEOVER_MS, JOIN_TRIES, PING_MS, DEAD_MS, ONLINE_NOTE, ROOM_KEY, GUEST_KEY};', ctx);
+  vm.runInContext('var __online = online; var __C = {TAKEOVER_MS, JOIN_TRIES, PING_MS, DEAD_MS, ONLINE_NOTE, ROOM_KEY, GUEST_KEY, SPEC_CLOSE_MS, MAX_SPECS};', ctx);
   const env = {ctx, online: ctx.__online, C: ctx.__C};
   env.online.myId = 'host-1';
   env.run = code => vm.runInContext(code, ctx);   // valuta un'espressione nel contesto (per ciò che è `const`, come Mode)

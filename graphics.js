@@ -20,6 +20,7 @@ function cardHTML(k, ctrl, rot, extra=''){
     `<span class="cmeta"><span class="adot" style="--ac:var(${ATTR_VAR[C.at]})" title="${ATTR_LABEL[C.at]}"></span><span>L${C.l}</span></span></span></span>`;
 }
 const DIR_IT = {T:'su',B:'giù',L:'sinistra',R:'destra',TL:'su a sinistra',TR:'su a destra',BL:'giù a sinistra',BR:'giù a destra'};
+const DIR_ARROW = {T:'↑',B:'↓',L:'←',R:'→',TL:'↖',TR:'↗',BL:'↙',BR:'↘'};
 function cardLabel(k){ const C=CARDS[k]; return `${C.n}, ATK ${C.a}, Link ${C.l}, ${ATTR_LABEL[C.at]}, frecce ${C.ar.map(d=>DIR_IT[d]).join(', ')}`; }
 
 // ---------- app state ----------
@@ -31,6 +32,7 @@ let mySeat = null;
 let selHand = null;
 let inspected = null;
 let animSeq = -1;
+let lastStatus = null;	// stato della partita all'ultimo disegno: serve a riconoscere il momento in cui la partita comincia (da sala d'attesa a preparazione)
 // Sequenza di animazione della mossa in corso (vedi "sequenza di animazione"): `fxView` = come si vede il tabellone in quel momento
 // ({ctrl: controllore mostrato per le carte che cambiano lato, sel: i bersagli da scegliere sono già visibili}); null = stato reale.
 let fxView = null, fxToken = 0, fxSeq = -1;
@@ -49,6 +51,13 @@ const viewOf = () => ({online: mode===Mode.ONLINE && mySeat!==null, seat: mySeat
 function who(s, cap){ return whoName(s, cap, viewOf()); }
 function fmtMsg(m){ return formatLog(m, viewOf()); }
 function canAct(seat){ return !present && (mode===Mode.LOCAL || mySeat===seat); }
+// Spettatore: in una stanza online senza un posto (guarda soltanto)
+const isSpectator = () => mode===Mode.ONLINE && online.spec;
+// Chi non è collegato, come lo sa l'host (e come lo dice agli spettatori)
+function seatOnline(s){ return online.host ? (s===mySeat || !!online.peersOnline) : !online.presence || online.presence.on[s]!==false; }
+function offlineNote(){ const off = [0,1].filter(s=>!seatOnline(s)); return off.length ? off.map(s=>pName(s)).join(' e ') + (off.length>1 ? ' non sono collegati.' : ' non è collegato.') : ''; }
+// Quanti spettatori ci sono (lo sa l'host; gli altri lo ricevono da lui)
+const specCount = () => online.host ? online.specs.size : (online.presence ? online.presence.specs : 0);
 // Vero mentre i dadi di preparazione girano o la sequenza di animazione di una mossa è in corso: i click su carte e caselle vengono ignorati.
 function isBusy(){ return !!(present || fxView || online.awaiting); }
 function deckOf(s){ return state.decksel ? state.decksel[s] : state.players?.['s'+s]?.deck; }
@@ -218,6 +227,8 @@ async function playFx(st, token){
 // ---------- render ----------
 function render(){
   if(!state) return;
+  const started = lastStatus==='lobby' && state.status!=='lobby'; lastStatus = state.status;
+  if(started && mode===Mode.ONLINE) centerBoard();	// online (giocatori e spettatori): non appena la partita inizia si scorre fino a centrare il campo
   if(state.sfx && state.seq!==setupSeq && state.status!=='lobby'){ setupSeq = state.seq; startPresent(state); }
   else if(present && present.seq!==state.seq) cancelPresent();	// lo stato è cambiato mentre i dadi giravano
   // sequenza di animazione della mossa: parte una volta per ogni nuovo stato con st.fx; se lo stato cambia mentre è in corso, viene annullata
@@ -338,6 +349,7 @@ function renderStatus()
 		const me = canAct(st.turn);
 		if (st.pending) { main = me ? (mode===Mode.LOCAL ? `${pName(st.turn)}, scegli chi attaccare` : 'Scegli quale mostro attaccare') : `${seatName(st.turn)} sceglie chi attaccare`; sub = me ? 'Il tuo mostro punta più avversari: tocca quello che vuoi attaccare.' : ''; }
 		else if (me) { main = mode===Mode.LOCAL ? `Turno di ${pName(st.turn)}` : 'Tocca a te'; sub = selHand==null ? 'Scegli una carta dalla mano.' : 'Scegli uno spazio libero.'; }
+		else if (isSpectator()) { main = `Turno di ${pName(st.turn)}`; sub = !online.peersOnline ? 'Non sei collegato alla stanza.' : offlineNote(); }
 		else { main = 'Turno dell’avversario'; sub = online.peersOnline ? '' : 'L’avversario non è connesso in questo momento.'; }
 	} else if(st.status==='over'){
 		const r = st.result; box.classList.add('overlay'); box.style.setProperty('--pc', `var(--p${r.winner})`);
@@ -386,20 +398,21 @@ function lobbyHTML(){
     h += `<div class="row"><span style="min-width:7.5em">${esc(seatName(s))}</span>`;
     if(!p) h += `<span class="note">libero</span>`;
     else if(mine) h += `<select data-deck-seat="${s}" aria-label="Il tuo mazzo">${deckOptions(p.deck)}</select>`;
-    else h += `<span>${DECKS[p.deck]?.name||'?'}${online.host && mySeat!==null && s===1-mySeat && !online.peersOnline ? ' <span class="note">(non connesso)</span>' : ''}</span>`;
+    else h += `<span>${DECKS[p.deck]?.name||'?'}${(online.host && mySeat!==null && s===1-mySeat && !online.peersOnline) || (isSpectator() && !seatOnline(s)) ? ' <span class="note">(non connesso)</span>' : ''}</span>`;
     h += `</div>`;
   }
   if(online.host && online.signal===false) h += `<p class="err">Il collegamento con il server che mette in contatto i giocatori è caduto: l’altro giocatore non può trovare la stanza. Sto riprovando a ricollegarmi…</p>`;
   if(online.host) h += `<button class="btn primary" id="btnStart" ${P.s1&&online.peersOnline?'':'disabled'}>Inizia la partita</button>`;
   else if(mySeat!==null) h += `<p class="note">La partita parte quando ${esc(who(1-mySeat))} la avvia.</p>`;
-  else h += `<p class="note">Stai guardando come spettatore: la stanza è già piena.</p>`;
+  else h += `<p class="note">Stai guardando come spettatore: la partita parte quando la avvia ${esc(pName(0))}.</p>`;
+  if(specCount()) h += `<p class="note">Spettatori: ${specCount()}.</p>`;
   return h;
 }
 
-const attrTag = at => `<span class="attr-dot" style="--ac:var(${ATTR_VAR[at]})"></span>${ATTR_LABEL[at]}`;	// pallino colorato + nome dell'attributo
+const attrTag = at => `<span class="attr-dot" style="--ac:var(${ATTR_VAR[at]})" title="${ATTR_LABEL[at]}"></span><span class="attr-name">${ATTR_LABEL[at]}</span>`;	// pallino colorato + nome dell'attributo
 const weakTo = at => Object.keys(BEATS).find(x => BEATS[x]===at);	// l'attributo che batte at
 // "forte/debole contro" in forma compatta: freccia (▲ vantaggio, ▼ svantaggio) + pallino e nome dell'attributo; il titolo (passando sopra) dice cosa significa la freccia
-const matchDot = (sym, what, at) => `<span class="mu" title="${what} ${ATTR_LABEL[at]}"><span role="img" aria-label="${what}">${sym}</span> ${attrTag(at)}</span>`;
+const matchDot = (sym, what, at) => `<span class="mu" title="${what} ${ATTR_LABEL[at]}"><span role="img" aria-label="${what}">${sym}</span>${attrTag(at)}</span>`;
 function inspectorDL(k) {
 	const C = CARDS[k];
 	return `
@@ -408,7 +421,7 @@ function inspectorDL(k) {
 		<dt>ATK</dt><dd>${C.a}</dd>
 		<dt>Link</dt><dd>${C.l}</dd>
 		<dt>Attributo</dt><dd>${attrTag(C.at)} <span class="matchup">(${matchDot('▲', 'Forte contro', BEATS[C.at])}${matchDot('▼', 'Debole contro', weakTo(C.at))})</span></dd>
-		<dt>Frecce</dt><dd>${C.ar.map(d=>DIR_IT[d]).join(', ')}</dd>
+		<dt class="ar">Frecce</dt><dd class="ar"><span role="img" aria-label="${C.ar.map(d=>DIR_IT[d]).join(', ')}">${C.ar.map(d=>DIR_ARROW[d]).join(' ')}</span></dd>
 	</dl>`;
 }
 
@@ -424,10 +437,19 @@ function measureInspector(el){
   el.style.minHeight = '';
   el.style.removeProperty('--insp-text');
   el.innerHTML = rows.join('');	// sovrapposti nella stessa cella della griglia: l'altezza è quella del più alto
-  // 1) larghezza del testo più largo (tutto su una riga): la carta può ingrandirsi solo finché i testi ci stanno su una riga, poi scala fino alla dimensione minima (vedi --insp-cell in style.css)
+  // 1) quanto spazio serve a ogni livello di compattezza (data-lv): 0 completo; 1 senza pallini; 2 pallini ma senza i nomi degli attributi; 3 senza "forte/debole contro";
+  //    4 anche senza la riga delle frecce (già disegnate sulla carta). Si sceglie il primo livello in cui tutto sta su una riga con la carta alla dimensione minima.
+  const widest = () => Math.ceil(Math.max(...[...el.querySelectorAll('dl')].map(d => d.getBoundingClientRect().width)));
   el.classList.add('measuring');
-  el.style.setProperty('--insp-text', Math.ceil(Math.max(...[...el.querySelectorAll('dl')].map(d => d.getBoundingClientRect().width))) + 'px');
+  el.style.setProperty('--insp-text', '9999px');	// carta al minimo
+  const minCard = el.querySelector('.insp-empty').getBoundingClientRect().width;
+  const widths = [];
+  for(let lv = 0; lv <= 4; lv++){ el.dataset.lv = lv; widths.push(widest()); }
   el.classList.remove('measuring');
+  let lv = widths.findIndex(w => w + minCard + 16 <= el.clientWidth);	// (16 = spazio tra carta e testo + margine, come in --insp-cell)
+  if(lv < 0) lv = 4;	// nemmeno così ci sta: si toglie il più possibile (gli altri testi andranno a capo)
+  el.dataset.lv = lv;
+  el.style.setProperty('--insp-text', widths[lv] + 'px');
   // 2) altezza del più alto, con la carta già alla dimensione calcolata (i testi vanno a capo solo se la carta è già al minimo)
   el.style.minHeight = el.offsetHeight + 'px';
   inspMeasured = true;
@@ -446,6 +468,8 @@ function renderTools(){
   if(mode===Mode.LOCAL && st.status!=='lobby') h += `<button class="btn" id="btnRotate">Gira il tavolo</button><button class="btn" id="btnFace" aria-pressed="${faceMode}">${faceMode?'Carte tutte nello stesso verso':'Carte verso chi le controlla'}</button>`;
   if(mode===Mode.ONLINE && !online.host && !online.peersOnline) h += `<button class="btn primary" id="btnReconnect">Riconnetti</button>`;
   if(mode===Mode.ONLINE && online.host && online.signal===false) h += `<button class="btn primary" id="btnResignal">Ricollega la stanza</button>`;
+  if(mode===Mode.ONLINE && st.status!=='lobby' && specCount()) h += `<span class="note">Spettatori: ${specCount()}</span>`;
+  if(isSpectator()) h += `<span class="note">Stai guardando come spettatore.</span>`;
   el.innerHTML = h;
 }
 
@@ -508,16 +532,17 @@ function startMatch(){
 try{ history.scrollRestoration = 'manual'; }catch{}	// ricaricando la pagina il browser non rimette lo scorrimento di prima: si riparte dall'alto (se si rientra in una partita, showGame scorre al campo)
 window.scrollTo(0, 0);
 const scrollMode = () => matchMedia('(prefers-reduced-motion:reduce)').matches ? 'auto' : 'smooth';	// scorrimento fluido, immediato se le animazioni sono ridotte
+function centerBoard(){ requestAnimationFrame(() => $('board').scrollIntoView({behavior: scrollMode(), block:'center'})); }	// scorrimento fluido fino a centrare il campo (dopo il disegno, così le misure sono quelle finali)
 function showGame(){
   const entering = $('game').hidden;	// può essere chiamata più volte: si scorre solo all'ingresso in partita
   $('menu').hidden = true; $('game').hidden = false; $('btnExit').hidden = false;
-  if(entering) requestAnimationFrame(() => $('board').scrollIntoView({behavior: scrollMode(), block:'center'}));	// fino a centrare il campo (dopo il disegno, così le misure sono quelle finali)
+  if(entering) centerBoard();
 }
 function exitToMenu(){
-  if(mode===Mode.ONLINE && connected()) send({type:'bye'});
-  destroyPeer(online.conn ? 250 : 0);
+  leaveRoom();
+  destroyPeer(online.conn || online.specs.size ? 250 : 0);	// (con un ritardo, i saluti a giocatore e spettatori fanno in tempo a partire)
   cancelPresent(); cancelFx(); setupSeq = -1; animSeq = -1;	// la prossima partita riparte da seq basso: le animazioni non vanno considerate già viste
-  mode = null; state = null; mySeat = null; selHand = null;
+  mode = null; state = null; mySeat = null; selHand = null; lastStatus = null;
   $('menu').hidden = false; $('game').hidden = true; $('btnExit').hidden = true; showResume();
   requestAnimationFrame(() => window.scrollTo({top:0, behavior: scrollMode()}));	// tornando alla home si scorre fino in cima
   try{ history.replaceState(null, '', location.pathname + location.search); }catch{}

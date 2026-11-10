@@ -110,6 +110,7 @@ input[type=text]{text-transform:uppercase;letter-spacing:.15em;width:8.5em;font-
 .attr-dot{display:inline-block;width:.8em;height:.8em;border-radius:50%;background:var(--ac);margin-right:6px;vertical-align:-.05em}	/* pallino dell'attributo nei dettagli carta (.adot dipende dalla larghezza della carta) */
 .matchup{margin-left:6px;color:var(--muted)}
 .matchup .mu{white-space:nowrap;margin-right:8px;display:inline-block}	/* ▲ forte contro / ▼ debole contro, ognuno con pallino e nome dell'attributo; a capo solo tra un gruppo e l'altro */
+.matchup .mu:last-child{margin-right:0}	/* niente spazio tra l'ultimo gruppo e la parentesi chiusa */
 .matchup .attr-dot{margin-right:4px}
 .adot{display:inline-block;width:11cqw;height:11cqw;border-radius:50%;background:var(--ac)}
 /* ===== Animazioni =====
@@ -158,6 +159,11 @@ input[type=text]{text-transform:uppercase;letter-spacing:.15em;width:8.5em;font-
 .insp-stack{display:grid;container-type:inline-size;--board-cell:var(--cell);--insp-cell:clamp(var(--board-cell), calc(100cqw - var(--insp-text, 0px) - 16px), 104px)}	/* la carta dei dettagli occupa lo spazio che resta accanto al testo (larghezza del riquadro - testo più largo, misurato da measureInspector in --insp-text), tra la dimensione delle carte sul campo (--cell di :root, salvata in --board-cell perché dentro .card --cell viene ridefinita) e 104px */	/* durante la misura (measureInspector) le varianti sono sovrapposte nella stessa cella: l'altezza è quella della più alta */
 .insp-stack.measuring .insp dl{width:max-content;white-space:nowrap}	/* solo durante la misura: testi su una riga, per misurarne la larghezza */
 .insp-stack>*{grid-area:1/1}
+/* riquadro stretto: la riga dell'attributo si compatta a gradini (data-lv, scelto da measureInspector), poi sparisce la riga delle frecce */
+.insp-stack[data-lv="1"] .matchup .attr-dot{display:none}	/* 1: via i pallini delle interazioni (pallino e nome dell'attributo della carta non spariscono mai) */
+.insp-stack[data-lv="2"] .matchup .attr-name{display:none}	/* 2: tornano i pallini, via i nomi degli attributi delle interazioni (il nome dell'attributo della carta non sparisce mai) */
+.insp-stack[data-lv="3"] .matchup,.insp-stack[data-lv="4"] .matchup{display:none}	/* 3: via forte/debole contro (restano pallino e nome dell'attributo della carta) */
+.insp-stack[data-lv="4"] .ar{display:none}	/* 4: via anche la riga delle frecce (la carta le mostra già) */
 .insp-empty{width:var(--insp-cell);height:var(--insp-cell);flex:none;border:2px dashed var(--line);border-radius:10px;box-sizing:border-box}
 .insp{display:flex;gap:14px;align-items:center}
 .insp .card{--cell:var(--insp-cell);flex:none}
