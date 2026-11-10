@@ -132,12 +132,26 @@ function targetsOf(st, i){
   return out;
 }
 
+// Ricorda chi controllava la carta in `cell` prima della mossa in corso (solo la prima volta: se poi cambia lato di nuovo, il "prima" resta quello originale)
+function noteFlip(st, cell, oldCtrl){ if(st.last && st.last.from[cell]===undefined) st.last.from[cell] = oldCtrl; }
+// Anteprima: quali mostri avversari attaccherebbe la carta hi della mano di seat se venisse messa in i (stesse regole di targetsOf, senza modificare nulla)
+function previewTargets(st, seat, hi, i){
+  if(st.status!=='play' || st.pending || st.turn!==seat || !st.hands[seat] || hi<0 || hi>=st.hands[seat].length || i<0 || i>24 || st.board[i]!==null) return [];
+  const r = Math.floor(i/5), c = i%5, out = [];
+  for(const [dr,dc] of vecs(st.hands[seat][hi], seat)){
+    const rr = r+dr, cc = c+dc; if(rr<0 || rr>4 || cc<0 || cc>4) continue;
+    const D = st.board[rr*5+cc];
+    if(D && D.k && D.c!==seat) out.push(rr*5+cc);
+  }
+  return out;
+}
 function Place(st, hi, i) {
 	const s = st.turn;
 	if(st.status!=='play' || st.pending || st.board[i]!==null || hi<0 || hi>=st.hands[s].length) return false;
 	const k = st.hands[s].splice(hi,1)[0];
 	st.board[i] = {k, o:s, c:s};
-	st.fx = {placed:i, drop:true, attacks:[], battles:[]};
+	st.fx = {placed:i, drop:true, attacks:[]};
+	st.last = {placed:i, from:{}};	// ultima mossa: per ogni carta che ha cambiato lato, chi la controllava prima (vedi noteFlip); resta fino alla mossa successiva
 	addLog(st, `${tp(s)} ${tv(s,'gioca','giochi')} ${CARDS[k].n}.`);
 	runCapture(st, i); return true;
 }
@@ -157,7 +171,7 @@ function chooseTarget(st, ti){
   const t = targetsOf(st, p.a).find(x=>x.i===ti); if(!t) return false;
   st.pending = null;
   // nuova tranche di animazioni: gli attacchi già mostrati prima della scelta non devono ripetersi (né il drop)
-  st.fx = {placed: st.fx ? st.fx.placed : null, drop:false, attacks:[], battles:[]};
+  st.fx = {placed: st.fx ? st.fx.placed : null, drop:false, attacks:[]};
   const n = ResolveAttack(st, p.a, t);
   if(n<0) endTurn(st); else runCapture(st, n);
   return true;
@@ -171,14 +185,13 @@ function ResolveAttack(st, a, t){
 	// Una stessa carta può cambiare lato due volte nella stessa mossa (catturata, poi attaccante che perde): per questo ogni cambio è registrato qui.
 	const at = {a, d:t.i, clash:back, flip:null, to:null};
 	st.fx.attacks.push(at);
-	if(!back){ D.c = s; at.flip = t.i; at.to = s; addLog(st, `${an} punta ${dn}, che non può rispondere: catturato.`); return t.i; }
+	if(!back){ noteFlip(st, t.i, D.c); D.c = s; at.flip = t.i; at.to = s; addLog(st, `${an} punta ${dn}, che non può rispondere: catturato.`); return t.i; }
 	const bonus = BEATS[CARDS[A.k].at]===CARDS[D.k].at ? BONUS : 0;
 	const av = CARDS[A.k].a + bonus, dv = CARDS[D.k].a;
-	st.fx.battles.push({a, d:t.i, av, dv, bonus});
 	if(bonus) at.boost = {from:CARDS[A.k].a, to:av};	// vantaggio di Attributo: per l'animazione, l'ATK dell'attaccante sale prima dello scontro
 	const atkTxt = bonus ? `${CARDS[A.k].a}+${bonus}` : `${av}`;
-	if(av>dv){ D.c = s; at.flip = t.i; at.to = s; addLog(st, `Battaglia: ${an} (${atkTxt}) batte ${dn} (${dv}). Catturato.`); return t.i; }
-	if(av<dv){ A.c = 1-s; at.flip = a; at.to = 1-s; addLog(st, `Battaglia: ${an} (${atkTxt}) perde contro ${dn} (${dv}) e passa ${tpa(1-s)}.`); return -1; }
+	if(av>dv){ noteFlip(st, t.i, D.c); D.c = s; at.flip = t.i; at.to = s; addLog(st, `Battaglia: ${an} (${atkTxt}) batte ${dn} (${dv}). Catturato.`); return t.i; }
+	if(av<dv){ noteFlip(st, a, A.c); A.c = 1-s; at.flip = a; at.to = 1-s; addLog(st, `Battaglia: ${an} (${atkTxt}) perde contro ${dn} (${dv}) e passa ${tpa(1-s)}.`); return -1; }
 	addLog(st, `Battaglia: ${an} e ${dn} pareggiano (${dv}). Nessuna cattura.`); return -1;
 }
 
@@ -236,6 +249,6 @@ function formatLog(m, view){
 
 if(typeof module !== 'undefined' && module.exports){
 	module.exports = {CARDS, DECKS, BEATS, ATTR_LABEL, DIRV, BONUS, setRng, d6, shuffle, pName, addLog, tp, tpa, tv, vecs, colToC, rowToR, colNum, rowNum,
-		newGame, blockCell, advanceSetup, setupOptions, chooseSetup, targetsOf, Place, runCapture, chooseTarget, ResolveAttack, score, endTurn,
+		newGame, blockCell, advanceSetup, setupOptions, chooseSetup, targetsOf, Place, runCapture, chooseTarget, ResolveAttack, score, endTurn, previewTargets,
 		actingSeat, applyMove, whoName, formatLog};
 }

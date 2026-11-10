@@ -72,7 +72,7 @@ function commit(fn){
   st.seq = (state.seq||0) + 1;
   state = st; selHand = null;
   render();
-  if(mode===Mode.ONLINE) pushOnline(st);
+  if(mode===Mode.ONLINE) pushOnline(st); else saveLocal();
 }
 // Unico punto da cui l'interfaccia compie una mossa. In locale o da host la applica il motore (applyMove la valida);
 // l'ospite online manda solo la mossa all'host, che la calcola e rimanda lo stato.
@@ -90,7 +90,7 @@ function startPresent(st){
   cancelPresent();
   const evs = (st.sfx && st.sfx.events) || [];
   if(!evs.length) return;	// niente da animare (es. scelta della sola colonna)
-  present = {seq:st.seq, evs, i:-1, lc:st.sfx.lc0||0, face:null, rolling:[false,false], fresh:null,
+  present = {seq:st.seq, evs, i:-1, lc:st.sfx.lc0||0, face:null, fresh:null,
     hidden:new Set(evs.filter(e=>e.cell!=null).map(e=>e.cell)),
     reduced:!!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)};
   stepPresent();
@@ -116,11 +116,9 @@ function stepPresent(){
         let f; do { f = 1 + Math.floor(Math.random()*6); } while(f===P.face[k]);	// ogni scatto mostra un volto diverso
         P.face[k] = f; spinning = true;
       } else P.face[k] = ev.d[k];
-      P.rolling[k] = t < stops[k];
     }
     if(spinning){ updateDice(); presentTimer = setTimeout(tick, 70); }
     else {
-      P.rolling = [false,false];
       // con un 6 il lancio è l'ultimo del gruppo: fine animazione subito, così la scelta di riga o colonna compare appena i dadi si fermano
       if(ev.res==='six' && P.i===P.evs.length-1){ present = null; render(); return; }
       revealEvent(ev); presentTimer = setTimeout(stepPresent, P.reduced?250:DIE_HOLD_MS[ev.res]);
@@ -133,7 +131,7 @@ function updateDice(){	// aggiorna solo i due dadi, senza ridisegnare tutto a og
   const P = present; if(!P || !P.face) return;
   for(const [id,k] of [['dieC',0],['dieR',1]]){
     const b = $(id); if(!b) continue;
-    b.textContent = DIE[P.face[k]]; b.parentNode.classList.toggle('rolling', P.rolling[k]);
+    b.textContent = DIE[P.face[k]];
   }
 }
 // ---------- sequenza di animazione della mossa ----------
@@ -257,6 +255,7 @@ function render(){
   renderInspector();
   const logHidden = present ? Math.max(0, (st.logCount||0) - present.lc) : 0;	// righe dei lanci non ancora mostrati
   $('log').innerHTML = (st.log||[]).slice(logHidden).map(l=>`<li>${esc(fmtMsg(l))}</li>`).join('');
+  announceLog(st, logHidden);
   renderTools();
   saveRoom();
 }
@@ -288,6 +287,7 @@ function renderBoard(){
   for(let dc=0; dc<5; dc++){ const c = flip?4-dc:dc; h += `<span class="lab">${showNums?colNum(st,c):''}</span>`; }
   const placing = !lobby && st.status==='play' && !st.pending && selHand!=null && canAct(st.turn);
   const lastPlaced = st.fx ? st.fx.placed : null;
+  const changedBy = !fxView && !present && st.last && st.last.from ? st.last.from : null;	// carte che nell'ultima mossa hanno cambiato lato (si segnano a fine animazione)
   const showSel = !fxView || fxView.sel;	// i bersagli da scegliere compaiono quando la sequenza di animazione arriva a mostrarli
   const sp = !lobby && st.status==='setup' && !present ? st.setup.pending : null;
   const picking = sp && canAct(sp.chooser) ? {p:sp, opts:setupOptions(st)} : null;
@@ -308,7 +308,8 @@ function renderBoard(){
         const cc = ctrlShown(st, i);	// controllore come si vede ora (durante la sequenza di animazione può essere ancora quello di prima della mossa)
         const isT = showSel && st.pending && st.pending.t.includes(i);
         const isA = showSel && st.pending && st.pending.a===i;
-        h += `<button class="cell has ${isT?'target':''} ${isA?'attacker':''} ${lastPlaced===i?'last':''}" data-i="${i}" aria-label="${pos}, ${esc(seatName(cc))}: ${esc(cardLabel(x.k))}${isT?', bersaglio possibile':''}">${cardHTML(x.k, cc, cc!==vs)}</button>`;
+        const chg = !!changedBy && changedBy[i]!==undefined && changedBy[i]!==x.c;
+        h += `<button class="cell has ${isT?'target':''} ${isA?'attacker':''} ${lastPlaced===i?'last':''} ${chg?'changed':''}" ${lastPlaced===i?`style="--ol:var(--p${x.o})"`:''} data-i="${i}" aria-label="${pos}, ${esc(seatName(cc))}: ${esc(cardLabel(x.k))}${chg?', cambiato di lato nell’ultima mossa':''}${isT?', bersaglio possibile':''}">${cardHTML(x.k, cc, cc!==vs)}</button>`;
       } else {
         const pk = pickK(r,c);
         if(pk) h += `<button class="cell open pick" data-pick="${pk}" aria-label="${pos}, libero: scegli ${picking.p.stage==='col'?'questa colonna':'questa riga'}"></button>`;
@@ -382,10 +383,10 @@ function renderExtra(){
   h += `<div class="note">Lancio iniziale: <b style="color:var(--p0)">${esc(seatName(0))} ${DIE[fr[0]]} ${fr[0]}</b>, <b style="color:var(--p1)">${esc(seatName(1))} ${DIE[fr[1]]} ${fr[1]}</b>. Gioca per primo ${esc(who(st.first))}.</div>`;
   h += `<div class="note">Spazi bloccati: ${shown} di 5.</div>`;
   // dadi: il dado della colonna è del primo giocatore, quello della riga del secondo (ognuno col colore del suo giocatore)
-  const dd = present && present.face ? present.face : S.last, rl = present ? present.rolling : [false,false];
+  const dd = present && present.face ? present.face : S.last;
   if(dd) h += `<div class="dice">`+
-    `<span class="die ${rl[0]?'rolling':''}" style="--dc:var(--p${st.first})"><b id="dieC">${DIE[dd[0]]}</b>colonna<small>${esc(seatName(st.first))}</small></span>`+
-    `<span class="die ${rl[1]?'rolling':''}" style="--dc:var(--p${1-st.first})"><b id="dieR">${DIE[dd[1]]}</b>riga<small>${esc(seatName(1-st.first))}</small></span></div>`;
+    `<span class="die" style="--dc:var(--p${st.first})"><b id="dieC">${DIE[dd[0]]}</b>colonna<small>${esc(seatName(st.first))}</small></span>`+
+    `<span class="die" style="--dc:var(--p${1-st.first})"><b id="dieR">${DIE[dd[1]]}</b>riga<small>${esc(seatName(1-st.first))}</small></span></div>`;
   box.innerHTML = h;	// l'invito a scegliere (colonna/riga/casella) sta nel riquadro di stato
 }
 function lobbyHTML(){
@@ -417,52 +418,32 @@ function inspectorDL(k) {
 	const C = CARDS[k];
 	return `
 	<dl>
-		<dt>Nome</dt><dd>${esc(C.n)}</dd>
+		<dt>Nome</dt><dd title="${esc(C.n)}">${esc(C.n)}</dd>
 		<dt>ATK</dt><dd>${C.a}</dd>
 		<dt>Link</dt><dd>${C.l}</dd>
 		<dt>Attributo</dt><dd>${attrTag(C.at)} <span class="matchup">(${matchDot('▲', 'Forte contro', BEATS[C.at])}${matchDot('▼', 'Debole contro', weakTo(C.at))})</span></dd>
-		<dt class="ar">Frecce</dt><dd class="ar"><span role="img" aria-label="${C.ar.map(d=>DIR_IT[d]).join(', ')}">${C.ar.map(d=>DIR_ARROW[d]).join(' ')}</span></dd>
+		<dt>Frecce</dt><dd><span role="img" aria-label="${C.ar.map(d=>DIR_IT[d]).join(', ')}">${C.ar.map(d=>DIR_ARROW[d]).join(' ')}</span></dd>
 	</dl>`;
 }
 
-// Il riquadro dei dettagli è un blocco solo, aggiornato con la carta scelta, e non cambia mai altezza: la sua altezza minima è quella della descrizione
-// più alta tra tutte le carte (le righe vanno a capo diversamente a seconda della larghezza). Si misura fuori dal flusso di gioco: all'inizio, quando la larghezza
-// cambia (ridimensionamento) e quando i font sono caricati; durante la partita è solo un min-height.
+// Il riquadro dei dettagli è un blocco solo, aggiornato con la carta scelta; altezza e compattezza le gestisce il CSS (vedi ".insp" in style.css).
 const EMPTY_INSP = 'Tocca una carta per vederne i dettagli.';
-let inspMeasured = false;
-function measureInspector(el){
-  if(!el.offsetParent) return;	// partita non visibile: non si può misurare, si riprova al prossimo ridisegno
-  const rows = [`<div class="insp"><span class="insp-empty"></span><div class="note" style="margin:0">${EMPTY_INSP}</div></div>`]
-    .concat(Object.keys(CARDS).map(k=>`<div class="insp"><span class="insp-empty"></span>${inspectorDL(k)}</div>`));
-  el.style.minHeight = '';
-  el.style.removeProperty('--insp-text');
-  el.innerHTML = rows.join('');	// sovrapposti nella stessa cella della griglia: l'altezza è quella del più alto
-  // 1) quanto spazio serve a ogni livello di compattezza (data-lv): 0 completo; 1 senza pallini; 2 pallini ma senza i nomi degli attributi; 3 senza "forte/debole contro";
-  //    4 anche senza la riga delle frecce (già disegnate sulla carta). Si sceglie il primo livello in cui tutto sta su una riga con la carta alla dimensione minima.
-  const widest = () => Math.ceil(Math.max(...[...el.querySelectorAll('dl')].map(d => d.getBoundingClientRect().width)));
-  el.classList.add('measuring');
-  el.style.setProperty('--insp-text', '9999px');	// carta al minimo
-  const minCard = el.querySelector('.insp-empty').getBoundingClientRect().width;
-  const widths = [];
-  for(let lv = 0; lv <= 4; lv++){ el.dataset.lv = lv; widths.push(widest()); }
-  el.classList.remove('measuring');
-  let lv = widths.findIndex(w => w + minCard + 16 <= el.clientWidth);	// (16 = spazio tra carta e testo + margine, come in --insp-cell)
-  if(lv < 0) lv = 4;	// nemmeno così ci sta: si toglie il più possibile (gli altri testi andranno a capo)
-  el.dataset.lv = lv;
-  el.style.setProperty('--insp-text', widths[lv] + 'px');
-  // 2) altezza del più alto, con la carta già alla dimensione calcolata (i testi vanno a capo solo se la carta è già al minimo)
-  el.style.minHeight = el.offsetHeight + 'px';
-  inspMeasured = true;
-}
 function renderInspector(){
-  const el = $('insp');
-  if(!inspMeasured) measureInspector(el);
-  el.innerHTML = inspected
+  $('insp').innerHTML = inspected
     ? `<div class="insp">${cardHTML(inspected, null, false)}${inspectorDL(inspected)}</div>`
     : `<div class="insp"><span class="insp-empty"></span><div class="note" style="margin:0">${EMPTY_INSP}</div></div>`;
 }
-window.addEventListener('resize', () => { inspMeasured = false; if(state) renderInspector(); });
-if(document.fonts && document.fonts.ready) document.fonts.ready.then(() => { inspMeasured = false; if(state) renderInspector(); });
+// Registro per i lettori di schermo: la lista si riscrive a ogni disegno (non può essere una zona "live", rileggerebbe tutto); si annunciano solo le righe
+// nuove, in una zona nascosta a parte. Al primo disegno (ingresso in una partita) non si rilegge la storia; con i dadi in corso restano escluse le righe non ancora mostrate.
+let logSpoken = null;
+function announceLog(st, hidden){
+  const visible = (st.logCount||0) - hidden;
+  if(logSpoken===null){ logSpoken = visible; return; }
+  if(visible < logSpoken) logSpoken = 0;	// nuova partita: il registro riparte
+  if(visible === logSpoken) return;
+  const n = visible - logSpoken; logSpoken = visible;
+  $('logLive').textContent = (st.log||[]).slice(hidden).slice(0, n).reverse().map(fmtMsg).join(' ');
+}
 function renderTools(){
   const st = state, el = $('tools'); let h = '';
   if(mode===Mode.LOCAL && st.status!=='lobby') h += `<button class="btn" id="btnRotate">Gira il tavolo</button><button class="btn" id="btnFace" aria-pressed="${faceMode}">${faceMode?'Carte tutte nello stesso verso':'Carte verso chi le controlla'}</button>`;
@@ -484,8 +465,11 @@ document.addEventListener('click', e=>{
   if(t.id==='btnResume') return resumeRoom();
   if(t.id==='btnForget') return forgetRoom();
   if(t.id==='btnResignal'){ if(online.peer) hostKeepSignal(online.peer); return; }
-  if(t.id==='btnRotate'){ if(isBusy()) return; localView = 1-localView; return render(); }
-  if(t.id==='btnFace'){ if(isBusy()) return; faceMode = !faceMode; return render(); }
+  if(t.id==='btnRotate'){ if(isBusy()) return; localView = 1-localView; saveLocal(); return render(); }
+  if(t.id==='btnFace'){ if(isBusy()) return; faceMode = !faceMode; prefSet('face', faceMode); saveLocal(); return render(); }
+  if(t.id==='btnTheme') return cycleTheme();
+  if(t.id==='btnResumeLocal') return resumeLocal();
+  if(t.id==='btnForgetLocal') return forgetLocal();
   if(t.id==='btnStart' || t.id==='btnAgain') return startMatch();
   if(!state) return;
   if(isBusy()) return;	// carte e caselle non sono cliccabili durante le animazioni
@@ -505,6 +489,18 @@ document.addEventListener('click', e=>{
     return render();
   }
 });
+// Anteprima: con una carta della mano scelta, passando (o mettendo il focus) su uno spazio libero si evidenziano i mostri avversari che attaccherebbe
+function setPreview(cells){
+  document.querySelectorAll('.cell.preview').forEach(e=>e.classList.remove('preview'));
+  for(const i of cells) cellEl(i)?.classList.add('preview');
+}
+function previewOf(target){
+  const c = target && target.closest ? target.closest('.cell[data-i]') : null;
+  if(!c || !state || selHand==null || isBusy() || !canAct(state.turn)) return [];
+  return previewTargets(state, state.turn, selHand, +c.dataset.i);
+}
+document.addEventListener('mouseover', e=>setPreview(previewOf(e.target)));
+document.addEventListener('focusin', e=>setPreview(previewOf(e.target)));
 document.addEventListener('change', e=>{
   const t = e.target;
   if(t.dataset && t.dataset.deckSeat!=null && state && state.status==='lobby'){
@@ -515,10 +511,44 @@ document.addEventListener('change', e=>{
   }
 });
 
+// ---------- preferenze e partita locale salvata ----------
+// Si ricordano nel browser (localStorage): il tema, "Carte verso chi le controlla" e l'ultima partita locale lasciata a metà (si può riprendere dalla home).
+const PREF_KEY = 'linkgrid-prefs', LOCAL_KEY = 'linkgrid-local';
+function prefGet(k, d){ try{ const v = JSON.parse(localStorage.getItem(PREF_KEY) || '{}')[k]; return v===undefined ? d : v; }catch{ return d; } }
+function prefSet(k, v){ try{ const o = JSON.parse(localStorage.getItem(PREF_KEY) || '{}'); o[k] = v; localStorage.setItem(PREF_KEY, JSON.stringify(o)); }catch{} }
+const THEMES = ['auto', 'light', 'dark'], THEME_LABEL = {auto:'Tema: automatico', light:'Tema: chiaro', dark:'Tema: scuro'};
+function applyTheme(t){
+  if(t==='light' || t==='dark') document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;	// senza attributo vale il tema del dispositivo
+  $('btnTheme').textContent = THEME_LABEL[t] || THEME_LABEL.auto;
+}
+function cycleTheme(){ const next = THEMES[(THEMES.indexOf(prefGet('theme', 'auto')) + 1) % THEMES.length]; prefSet('theme', next); applyTheme(next); }
+function saveLocal(){	// a ogni mossa (e a ogni cambio di vista); a partita finita non c'è più nulla da riprendere
+  if(mode!==Mode.LOCAL || !state) return;
+  if(state.status!=='play' && state.status!=='setup'){ forgetLocal(true); return; }
+  const copy = Object.assign({}, state); copy.fx = null; copy.sfx = null;	// (le animazioni non si rifanno al ritorno)
+  storeSaved(LOCAL_KEY, {state:copy, view:localView, face:faceMode});
+}
+function forgetLocal(quiet){ try{ localStorage.removeItem(LOCAL_KEY); }catch{} if(!quiet) showLocalResume(); }
+function showLocalResume(){
+  const box = $('localResume'), r = loadSaved(LOCAL_KEY);
+  if(!r || !r.state || (r.state.status!=='play' && r.state.status!=='setup')){ box.hidden = true; box.innerHTML = ''; return; }
+  const st = r.state, free = st.board ? st.board.filter(x=>x===null).length : 0;
+  box.hidden = false;
+  box.innerHTML = `<div>Hai lasciato una partita a metà (${st.status==='setup' ? 'preparazione del campo' : `turno di ${esc(pName(st.turn))}, ${free} spazi liberi`}).</div>`+
+    `<div class="row"><button class="btn primary" id="btnResumeLocal">Riprendi la partita</button><button class="btn" id="btnForgetLocal">Dimentica</button></div>`;
+}
+function resumeLocal(){
+  const r = loadSaved(LOCAL_KEY); if(!r || !r.state){ showLocalResume(); return; }
+  mode = Mode.LOCAL; mySeat = null; localView = r.view===1 ? 1 : 0; faceMode = !!r.face; selHand = null; inspected = null; flash = ''; logSpoken = null;
+  state = Object.assign({}, r.state, {fx:null, sfx:null});
+  showGame(); render();
+}
+applyTheme(prefGet('theme', 'auto')); $('faceOpt').checked = !!prefGet('face', false);
+
 // ---------- local ----------
 function startLocal(){
   mode = Mode.LOCAL; mySeat = null; localView = 0; selHand = null; inspected = null; flash='';
-  faceMode = $('faceOpt').checked;
+  faceMode = $('faceOpt').checked; prefSet('face', faceMode);
   state = {seq:0, status:'lobby', players:{s0:{deck:$('ld0').value}, s1:{deck:$('ld1').value}}};
   showGame(); startMatch();
 }
@@ -542,8 +572,8 @@ function exitToMenu(){
   leaveRoom();
   destroyPeer(online.conn || online.specs.size ? 250 : 0);	// (con un ritardo, i saluti a giocatore e spettatori fanno in tempo a partire)
   cancelPresent(); cancelFx(); setupSeq = -1; animSeq = -1;	// la prossima partita riparte da seq basso: le animazioni non vanno considerate già viste
-  mode = null; state = null; mySeat = null; selHand = null; lastStatus = null;
-  $('menu').hidden = false; $('game').hidden = true; $('btnExit').hidden = true; showResume();
+  mode = null; state = null; mySeat = null; selHand = null; lastStatus = null; logSpoken = null;
+  $('menu').hidden = false; $('game').hidden = true; $('btnExit').hidden = true; showResume(); showLocalResume();
   requestAnimationFrame(() => window.scrollTo({top:0, behavior: scrollMode()}));	// tornando alla home si scorre fino in cima
   try{ history.replaceState(null, '', location.pathname + location.search); }catch{}
 }
@@ -615,6 +645,6 @@ $('rulesMenu').querySelector('details').open = true;	// nella home le regole par
 const hm =/^#stanza-([A-Za-z0-9]{5})$/.exec(location.hash);
 if(hm) $('joinCode').value = hm[1].toUpperCase();
 initOnline();
-showResume();
+showResume(); showLocalResume();
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) netWake(); });
 window.addEventListener('online', netWake);

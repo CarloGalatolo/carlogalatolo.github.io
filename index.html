@@ -19,6 +19,7 @@
   <header class="top">
     <h1>YGO Link Grid</h1>
     <span class="spacer"></span>
+    <button class="btn" id="btnTheme" aria-label="Cambia tema"></button>
     <button class="btn" id="btnExit" hidden>Torna al menu</button>
   </header>
 
@@ -31,6 +32,7 @@
 		<div class="row"><label for="ld1">Giocatore 2</label><select id="ld1"></select></div>
 		<div class="row"><label style="min-width:0"><input type="checkbox" id="faceOpt"> Carte rivolte verso chi le controlla</label></div>
 		<button class="btn primary" id="btnLocal">Inizia la partita</button>
+		<div class="note resume" id="localResume" hidden></div>
       </section>
       <section>
 		<h2>Online, in una stanza</h2>
@@ -65,7 +67,7 @@
       <div class="box" id="inspBox"><h3>Carta selezionata</h3><div id="insp" class="insp-stack"></div></div>
       <div class="tools" id="tools"></div>
       <div class="box rules" id="rulesGame"></div>
-      <div class="box"><h3>Registro</h3><ol class="log" id="log"></ol></div>
+      <div class="box"><h3>Registro</h3><ol class="log" id="log"></ol><div id="logLive" class="sr-only" aria-live="polite" aria-atomic="true"></div></div>
     </aside>
   </main>
   

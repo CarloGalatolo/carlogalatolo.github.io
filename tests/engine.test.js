@@ -398,3 +398,35 @@ test('il registro prodotto dal motore usa segnaposto e si legge bene da entrambi
   assert.equal(E.formatLog(line, {online:true, seat:0}), 'Tu giochi A.');
   assert.equal(E.formatLog(line, {online:true, seat:1}), 'L’avversario gioca A.');
 });
+
+// ---------- ultima mossa e anteprima ----------
+test('ultima mossa: ricorda chi controllava le carte che hanno cambiato lato, e resta fino alla mossa successiva', () => {
+  const st = game({board:{[at(2,1)]:['b',1]}, hands:[['a'],['b']]});
+  E.Place(st, 0, at(2,0));
+  assert.equal(st.last.placed, at(2,0)); assert.deepEqual(st.last.from, {[at(2,1)]:1}, 'B era del Giocatore 2');
+  assert.equal(st.board[at(2,1)].c, 0, 'ora è del Giocatore 1');
+  E.Place(st, 0, at(4,4));   // mossa successiva (Giocatore 2): l'ultima mossa cambia
+  assert.equal(st.last.placed, at(4,4)); assert.deepEqual(st.last.from, {});
+});
+test('ultima mossa: una carta che cambia lato due volte e torna com\'era non risulta cambiata (il "prima" è quello originale)', () => {
+  const st = game({board:{[at(2,1)]:['b',1], [at(1,1)]:['c',1]}, hands:[['a'],[]]});
+  E.Place(st, 0, at(2,0));
+  assert.equal(st.last.from[at(2,1)], 1); assert.equal(st.board[at(2,1)].c, 1, 'stesso controllore di prima: nessun cambiamento netto');
+});
+test('anteprima: previewTargets elenca i mostri avversari che la carta attaccherebbe, senza toccare lo stato', () => {
+  const st = game({board:{[at(2,1)]:['b',1], [at(2,2)]:['d',0]}, hands:[['a', 'two'],[]]});
+  const before = JSON.stringify(st);
+  assert.deepEqual(E.previewTargets(st, 0, 0, at(2,0)), [at(2,1)], 'A (freccia a destra) in (2,0) attacca B, non il proprio mostro più in là');
+  assert.deepEqual(E.previewTargets(st, 0, 0, at(0,0)), [], 'in un altro spazio non attacca nulla');
+  assert.deepEqual(E.previewTargets(st, 0, 1, at(1,1)), [at(2,1)], 'Due in (1,1): a destra (1,2) è vuoto, in giù ce B');
+  assert.equal(JSON.stringify(st), before, 'lo stato non cambia');
+});
+test('anteprima: nessun risultato per mosse non valide (spazio occupato o bloccato, turno altrui, scelta in sospeso, indici fuori misura)', () => {
+  const st = game({board:{[at(2,1)]:['b',1]}, hands:[['a'],['b']], blocked:[0]});
+  assert.deepEqual(E.previewTargets(st, 0, 0, at(2,1)), [], 'spazio occupato');
+  assert.deepEqual(E.previewTargets(st, 0, 0, 0), [], 'spazio bloccato');
+  assert.deepEqual(E.previewTargets(st, 1, 0, at(2,0)), [], 'non è il turno del Giocatore 2');
+  assert.deepEqual(E.previewTargets(st, 0, 5, at(2,0)), [], 'carta inesistente');
+  assert.deepEqual(E.previewTargets(st, 0, 0, 99), [], 'spazio fuori dal campo');
+  st.pending = {a:0, t:[1]}; assert.deepEqual(E.previewTargets(st, 0, 0, at(2,0)), [], 'c\'è una scelta in sospeso');
+});

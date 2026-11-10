@@ -90,7 +90,10 @@ input[type=text]{text-transform:uppercase;letter-spacing:.15em;width:8.5em;font-
 .cell.target::after,.cell.attacker::after{content:'';position:absolute;inset:0;border-radius:10px;pointer-events:none}	/* anelli di selezione: sulla cella (non sulla carta) per poterli far comparire a tempo, vedi "selnew" */
 .cell.target::after{box-shadow:0 0 0 3px var(--sel),0 0 18px color-mix(in srgb,var(--sel) 60%,transparent)}
 .cell.attacker::after{box-shadow:0 0 0 3px var(--ink)}
-.cell.last .card{outline:2px dotted var(--ink);outline-offset:2px}
+.cell.last .card,.cell.preview .card,.cell.changed .card{outline:2px dotted var(--ink);outline-offset:2px}	/* stesso bordino punteggiato per tre segni, distinti dal colore: */
+.cell.changed .card{outline-color:var(--ink)}	/* carte cambiate di lato nell'ultima mossa (storico della combo): neutro */
+.cell.last .card{outline-color:var(--ol,var(--ink))}	/* carta appena giocata: colore di chi l'ha giocata (--ol, impostato da renderBoard), cioè il giocatore passato */
+.cell.preview .card{outline-color:var(--sel)}	/* mostri che la carta scelta attaccherebbe: colore del giocatore attuale (--sel = --pc del campo) */
 /* card */
 .card{position:relative;width:var(--cell);height:var(--cell);border-radius:10px;background:var(--raised);border:2px solid var(--line);container-type:inline-size;overflow:hidden;color:var(--ink);text-align:center;display:block}
 .card.c0{--pc:var(--p0)}	/* --pc = colore del controllore attuale */
@@ -122,8 +125,6 @@ input[type=text]{text-transform:uppercase;letter-spacing:.15em;width:8.5em;font-
 @property --atk-n{syntax:'<integer>';inherits:false;initial-value:0}	/* contatore animabile del valore ATK */
 .card.drop{animation:drop var(--lead) ease-out}	/* carta appena piazzata */
 .cell.blocked.fresh{animation:blockin .4s ease-out}	/* casella appena bloccata dai dadi */
-/* scossa del dado in corso di lancio: DISATTIVATA (togli il commento per riattivarla; i keyframes dieshake sono in fondo) */
-/* .die.rolling b{animation:dieshake .22s linear infinite} */
 /* affondo sulla cella (non sulla carta, così non confligge con la rotazione). --lx/--ly = direzione verso il bersaglio (misurata sullo schermo) */
 .cell.lunge{z-index:3;animation:lunge var(--atk-time) linear}
 /* aumento ATK per vantaggio di Attributo: il numero conta da --atk-from a --atk-to (contatore @property + counter(), perché il testo non si anima da solo),
@@ -138,7 +139,7 @@ input[type=text]{text-transform:uppercase;letter-spacing:.15em;width:8.5em;font-
 .card.spin.p1{--d:-1}
 .card.spin:not(.face) .cbody{animation:unspin var(--spin-time) ease-in-out}	/* nel modo normale il testo resta sempre dritto (ruotano solo bordo e frecce): contro-rotazione del corpo carta; in modalità "carte verso chi le controlla" (.face) il testo ruota con la carta */
 
-@media (prefers-reduced-motion:reduce){.card.spin,.card.spin .cbody,.card.drop,.cell.target .card,.board.selnew .cell.target::after,.board.selnew .cell.attacker::after,.cell.lunge,.catk.boost,.catk.boost::after,.cell.blocked.fresh,.die.rolling b{animation:none}.hcard{transition:none}}
+@media (prefers-reduced-motion:reduce){.card.spin,.card.spin .cbody,.card.drop,.cell.target .card,.board.selnew .cell.target::after,.board.selnew .cell.attacker::after,.cell.lunge,.catk.boost,.catk.boost::after,.cell.blocked.fresh.hcard{transition:none}}
 /* panel */
 .panel{display:flex;flex-direction:column;gap:14px}
 .box{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
@@ -156,20 +157,23 @@ input[type=text]{text-transform:uppercase;letter-spacing:.15em;width:8.5em;font-
 .log{list-style:none;margin:0;padding:0;height:260px;overflow:auto;font-size:.9rem}	/* altezza fissa (non max-height): il registro non si allunga a ogni riga */
 .log li{padding:5px 0;border-bottom:1px solid var(--line)}
 .log li:first-child{font-weight:600}
-.insp-stack{display:grid;container-type:inline-size;--board-cell:var(--cell);--insp-cell:clamp(var(--board-cell), calc(100cqw - var(--insp-text, 0px) - 16px), 104px)}	/* la carta dei dettagli occupa lo spazio che resta accanto al testo (larghezza del riquadro - testo più largo, misurato da measureInspector in --insp-text), tra la dimensione delle carte sul campo (--cell di :root, salvata in --board-cell perché dentro .card --cell viene ridefinita) e 104px */	/* durante la misura (measureInspector) le varianti sono sovrapposte nella stessa cella: l'altezza è quella della più alta */
-.insp-stack.measuring .insp dl{width:max-content;white-space:nowrap}	/* solo durante la misura: testi su una riga, per misurarne la larghezza */
-.insp-stack>*{grid-area:1/1}
-/* riquadro stretto: la riga dell'attributo si compatta a gradini (data-lv, scelto da measureInspector), poi sparisce la riga delle frecce */
-.insp-stack[data-lv="1"] .matchup .attr-dot{display:none}	/* 1: via i pallini delle interazioni (pallino e nome dell'attributo della carta non spariscono mai) */
-.insp-stack[data-lv="2"] .matchup .attr-name{display:none}	/* 2: tornano i pallini, via i nomi degli attributi delle interazioni (il nome dell'attributo della carta non sparisce mai) */
-.insp-stack[data-lv="3"] .matchup,.insp-stack[data-lv="4"] .matchup{display:none}	/* 3: via forte/debole contro (restano pallino e nome dell'attributo della carta) */
-.insp-stack[data-lv="4"] .ar{display:none}	/* 4: via anche la riga delle frecce (la carta le mostra già) */
+/* Riquadro "Carta selezionata": solo CSS, niente misure in JavaScript.
+   - Ogni riga di testo sta su una sola riga (il nome lungo si tronca con "…", per intero nel tooltip), quindi l'altezza non cambia da una carta all'altra.
+   - La carta usa lo spazio che resta accanto al testo: tra la dimensione delle carte sul campo (--board-cell = --cell di :root, salvata qui perché dentro .card --cell viene
+     ridefinita) e 104px. Quanto spazio serve al testo dipende dal livello di compattezza (--insp-text, larghezza misurata della riga più larga senza il nome).
+   - Riquadro stretto: la riga dell'attributo si compatta a gradini. Soglie = testo del livello + 16px (spazio) + carta minima, con le larghezze del testo misurate nel browser. */
+.insp-stack{container-type:inline-size;--board-cell:var(--cell)}
+.insp{display:flex;gap:14px;align-items:center;min-height:7.2rem;
+  --insp-text:20.9rem;	/* livello 0: tutto */
+  --insp-cell:clamp(var(--board-cell), calc(100cqw - var(--insp-text) - 16px), 104px)}
+@container (width < calc(20.9rem + 16px + min(16.4vw, 92px))){ .insp{--insp-text:18.9rem} .matchup .attr-dot{display:none} }	/* 1: via i pallini delle interazioni (pallino e nome dell'attributo della carta non spariscono mai) */
+@container (width < calc(18.9rem + 16px + min(16.4vw, 92px))){ .insp{--insp-text:14.5rem} .matchup .attr-dot{display:inline-block} .matchup .attr-name{display:none} }	/* 2: tornano i pallini, via i nomi delle interazioni */
+@container (width < calc(14.5rem + 16px + min(16.4vw, 92px))){ .insp{--insp-text:9.5rem} .matchup{display:none} }	/* 3: via forte/debole contro */
 .insp-empty{width:var(--insp-cell);height:var(--insp-cell);flex:none;border:2px dashed var(--line);border-radius:10px;box-sizing:border-box}
-.insp{display:flex;gap:14px;align-items:center}
 .insp .card{--cell:var(--insp-cell);flex:none}
-.insp dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:.92rem}
+.insp dl{margin:0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 10px;font-size:.92rem;flex:1;min-width:0}
 .insp dt{color:var(--muted)}
-.insp dd{margin:0}
+.insp dd{margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}	/* mai a capo: se non ci sta (riquadro più stretto del testo e della carta minima) si taglia con "…" */
 .rules{font-size:.92rem}
 .rulesrow{margin-top:16px;display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));align-items:stretch}	/* preparazione e regole affiancate come i due mazzi; stretch: i due riquadri hanno sempre la stessa altezza, quella del più alto (si adegua se uno si apre o si chiude) */
 .resume{margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--cellbg)}
@@ -185,6 +189,7 @@ input[type=text]{text-transform:uppercase;letter-spacing:.15em;width:8.5em;font-
 .turnbox{border-left:6px solid var(--pc);padding-left:11px;background:color-mix(in srgb,var(--pc) 8%,var(--surface))}	/* colore del giocatore di turno; il bordo da 6px prende 5px di padding per non spostare il testo */
 .overlay{padding:13px 15px;border:2px solid var(--pc);	/* bordo da 2px: padding ridotto di 1px per non alzare il riquadro */background:color-mix(in srgb,var(--pc) 10%,var(--surface))}
 .overlay .big{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:1.5rem}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}	/* solo per i lettori di schermo (annuncio delle nuove righe del registro) */
 [hidden]{display:none!important}
 
 @keyframes pulse{to{transform:rotate(var(--r,0deg)) scale(1.05)}}
@@ -202,5 +207,4 @@ input[type=text]{text-transform:uppercase;letter-spacing:.15em;width:8.5em;font-
 	100%{translate:0 0;scale:1}}
 @keyframes blockin{from{scale:1.25;opacity:.3}to{scale:1;opacity:1}}
 @keyframes selin{from{opacity:0}}
-@keyframes dieshake{0%{rotate:-14deg;translate:0 1px}50%{rotate:12deg;translate:0 -2px}100%{rotate:-14deg;translate:0 1px}}
 @keyframes unspin{from{rotate:calc(-180deg * var(--d))}to{rotate:0deg}}
