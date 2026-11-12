@@ -58,5 +58,18 @@
   "71791814": {"n":"Magical Musketeer Max","l":1,"a":1000,"at":"LUCE","ar":["B"]},
   "14812471": {"n":"Salamangreat Balelynx","l":1,"a":500,"at":"FUOCO","ar":["B"]},
   "31226177": {"n":"Imduk the World Chalice Dragon","l":1,"a":800,"at":"VENTO","ar":["T"]},
-  "43735670": {"n":"Marincess Blue Slug","l":1,"a":1500,"at":"ACQUA","ar":["B"]}
+  "43735670": {"n":"Marincess Blue Slug","l":1,"a":1500,"at":"ACQUA","ar":["B"]},
+  "25072579": {"n":"Prototype Sky Striker Ace - Amatsu","l":1,"a":1500,"at":"OSCURITA","ar":["B"]},
+  "77102944": {"n":"Appliancer Laundry Dragon","l":1,"a":1500,"at":"ACQUA","ar":["T"]},
+  "96380700": {"n":"Talkback Lancer","l":1,"a":1200,"at":"OSCURITA","ar":["B"]},
+  "81769387": {"n":"Appliancer Propelion","l":1,"a":1200,"at":"VENTO","ar":["T"]},
+  "08173184": {"n":"Repair Genex Controller","l":1,"a":1200,"at":"OSCURITA","ar":["L"]},
+  "61245672": {"n":"Decode Talker Heatsoul","l":3,"a":2300,"at":"FUOCO","ar":["T","BL","BR"]},
+  "97661969": {"n":"Aussa the Earth Charmer, Immovable","l":2,"a":1850,"at":"TERRA","ar":["BL","BR"]},
+  "98127546": {"n":"Underworld Goddess of the Closed World","l":5,"a":3000,"at":"LUCE","ar":["T","TR","R","B","BR"]},
+  "42307760": {"n":"Ragnaraika Stag Sovereign","l":5,"a":3300,"at":"TERRA","ar":["L","R","BL","B","BR"]},
+  "93672138": {"n":"Evil★Twin's Trouble Sunny","l":4,"a":3300,"at":"LUCE","ar":["T","L","R","B"]},
+  "50546029": {"n":"G Golem Dignified Trilithon","l":4,"a":3200,"at":"TERRA","ar":["T","L","R","B"]},
+  "04063756": {"n":"Mediclius the Extraordinary Power Patron","l":3,"a":3000,"at":"ACQUA","ar":["BL","B","BR"]},
+  "01948619": {"n":"Xtra HERO Wonder Driver","l":2,"a":1900,"at":"LUCE","ar":["T","B"]}
 }

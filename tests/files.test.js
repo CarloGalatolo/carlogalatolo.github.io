@@ -103,3 +103,10 @@ test('animazioni ridotte: la regola @media (prefers-reduced-motion) spegne davve
   assert.match(body, /\.hcard\{transition:none\}/, 'la transizione della mano è spenta');
   assert.equal((body.match(/\{/g) || []).length, (body.match(/\}/g) || []).length, 'graffe bilanciate dentro la @media');
 });
+
+test('loader.js: gli script e i dati si caricano con ?v=VERSION, per non mescolare file vecchi in cache con quelli nuovi', () => {
+  const loader = read('loader.js');
+  assert.match(loader, /const VERSION = '[^']+'/, 'VERSION definita');
+  assert.ok(/url \+ '\?v=' \+ VERSION/.test(loader) && /src \+ '\?v=' \+ VERSION/.test(loader), 'dati e script usano ?v=VERSION');
+  assert.doesNotThrow(() => new vm.Script(loader, {filename: 'loader.js'}), 'sintassi valida');
+});

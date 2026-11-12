@@ -231,7 +231,7 @@ test('home: accanto al nome di ogni mazzo, per ogni valore di Link presente c’
   const alba = cols('Alba'), mezz = cols('Mezzogiorno'), notte = cols('Mezzanotte');
   assert.deepEqual(alba.map(c => c.lab), ['4×L1', '5×L2', '4×L3', '2×L4']);
   assert.deepEqual(mezz.map(c => c.lab), ['11×L2', '4×L3'], 'solo i valori presenti, come le etichette della nota');
-  assert.deepEqual(notte.map(c => c.lab), ['8×L1', '2×L3', '5×L4']);
+  assert.deepEqual(notte.map(c => c.lab), ['7×L1', '2×L2', '2×L3', '3×L4', '1×L5']);
   assert.equal(mezz[0].h, Math.max(...[...alba, ...mezz, ...notte].map(c => c.h)), 'la barra più alta in assoluto è quella di 11 mostri');
   assert.ok(mezz[0].h > alba[1].h, 'stessa scala tra mazzi: 11 mostri sono più alti di 5');
   assert.equal(alba[0].h, alba[2].h, 'Alba: 4 e 4 hanno la stessa altezza'); assert.ok(alba[0].h > alba[3].h, 'più alte di 2');

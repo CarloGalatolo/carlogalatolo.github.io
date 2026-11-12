@@ -69,12 +69,18 @@ test('mazzi: tutti i mazzi hanno 15 carte esistenti e distinte, e nessuna carta 
     assert.equal(d.cards.length, 15, name + ': 15 carte'); assert.equal(new Set(d.cards).size, 15, name + ': nessun doppione');
     for(const k of d.cards){ assert.ok(CARDS[k], name + ': la carta ' + k + ' esiste'); assert.ok(!seen.has(k), `${k} è sia in ${seen.get(k)} sia in ${name}`); seen.set(k, name); }
   }
-  assert.equal(Object.keys(DECKS).length, 4); assert.equal(seen.size, Object.keys(CARDS).filter(k => !k.startsWith('t_')).length, 'ogni carta dei dati è in un mazzo (le "t_" sono carte inventate dei test)');
+  assert.equal(Object.keys(DECKS).length, 4);
+  // le carte non si cancellano mai: restano nei dati anche se nessun mazzo le usa più (le "t_" sono carte inventate dei test)
+  const data = Object.keys(CARDS).filter(k => !k.startsWith('t_'));
+  assert.ok(data.length >= seen.size, 'ogni carta dei mazzi è nei dati');
+  for(const ritirata of ['14812471', '90207654', '31226177', '13143275', '74997493', '21887175', '76145142', '61245672', '71791814', '23689428', '98127546', '31313405', '45112597']){   // tolte da Mezzanotte nei vari ritocchi
+    assert.ok(CARDS[ritirata] && !seen.has(ritirata), ritirata + ': resta nei dati ma non è in nessun mazzo');
+  }
 });
-test('mazzi: Mezzogiorno è tutto Link 2 e 3; Mezzanotte punta sui Link alti e tappa i buchi con i Link 1; stesso Link totale di Alba e Tramonto', () => {
-  const links = d => { const l = {1:0, 2:0, 3:0, 4:0}; for(const k of DECKS[d].cards) l[CARDS[k].l]++; return l; };
-  assert.deepEqual(links('mezzogiorno'), {1:0, 2:11, 3:4, 4:0});
-  assert.deepEqual(links('mezzanotte'), {1:8, 2:0, 3:2, 4:5});
+test('mazzi: Mezzogiorno è tutto Link 2 e 3; Mezzanotte punta sui Link alti (1 da 5, 3 da 4) e tappa i buchi con 7 Link 1; Link totale 34 per tutti', () => {
+  const links = d => { const l = {1:0, 2:0, 3:0, 4:0, 5:0}; for(const k of DECKS[d].cards) l[CARDS[k].l]++; return l; };
+  assert.deepEqual(links('mezzogiorno'), {1:0, 2:11, 3:4, 4:0, 5:0});
+  assert.deepEqual(links('mezzanotte'), {1:7, 2:2, 3:2, 4:3, 5:1});
   for(const d of Object.keys(DECKS)) assert.equal(DECKS[d].cards.reduce((s, k) => s + CARDS[k].l, 0), 34, d + ': Link totale 34');
 });
 test('ogni mostro ha tante frecce quanto il suo Link Rating', () => {
