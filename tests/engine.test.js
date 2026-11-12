@@ -41,9 +41,9 @@ function game({board = {}, hands = [[], []], turn = 0, first = 0, blocked = []} 
 const at = (r, c) => r * 5 + c;
 
 // ---------- dati dei mazzi (quelli veri) ----------
-test('mazzi: 15 carte distinte e tutte esistenti, struttura identica nei due mazzi', () => {
+test('mazzi: 15 carte distinte e tutte esistenti, struttura identica nei due mazzi Alba e Tramonto', () => {
   const sum = (arr, f) => arr.reduce((s, x) => s + f(x), 0);
-  const stats = Object.entries(DECKS).map(([name, d]) => {
+  const stats = Object.entries(DECKS).filter(([name]) => ['alba', 'tramonto'].includes(name)).map(([name, d]) => {
     assert.equal(d.cards.length, 15, name + ': 15 carte');
     assert.equal(new Set(d.cards).size, 15, name + ': nessun doppione');
     for(const k of d.cards) assert.ok(CARDS[k], name + ': la carta ' + k + ' esiste');
@@ -62,6 +62,20 @@ test('mazzi: 15 carte distinte e tutte esistenti, struttura identica nei due maz
   assert.deepEqual(x.arrows, y.arrows, 'stessa distribuzione delle frecce nei due mazzi');
   assert.equal(x.attrs.size, 6, 'tutti e sei gli Attributi (Alba)'); assert.equal(y.attrs.size, 6, 'tutti e sei gli Attributi (Tramonto)');
   assert.equal(x.atk, 27000); assert.equal(y.atk, 27250);
+});
+test('mazzi: tutti i mazzi hanno 15 carte esistenti e distinte, e nessuna carta è in due mazzi', () => {
+  const seen = new Map();
+  for(const [name, d] of Object.entries(DECKS)){
+    assert.equal(d.cards.length, 15, name + ': 15 carte'); assert.equal(new Set(d.cards).size, 15, name + ': nessun doppione');
+    for(const k of d.cards){ assert.ok(CARDS[k], name + ': la carta ' + k + ' esiste'); assert.ok(!seen.has(k), `${k} è sia in ${seen.get(k)} sia in ${name}`); seen.set(k, name); }
+  }
+  assert.equal(Object.keys(DECKS).length, 4); assert.equal(seen.size, Object.keys(CARDS).filter(k => !k.startsWith('t_')).length, 'ogni carta dei dati è in un mazzo (le "t_" sono carte inventate dei test)');
+});
+test('mazzi: Mezzogiorno è tutto Link 2 e 3; Mezzanotte punta sui Link alti e tappa i buchi con i Link 1; stesso Link totale di Alba e Tramonto', () => {
+  const links = d => { const l = {1:0, 2:0, 3:0, 4:0}; for(const k of DECKS[d].cards) l[CARDS[k].l]++; return l; };
+  assert.deepEqual(links('mezzogiorno'), {1:0, 2:11, 3:4, 4:0});
+  assert.deepEqual(links('mezzanotte'), {1:8, 2:0, 3:2, 4:5});
+  for(const d of Object.keys(DECKS)) assert.equal(DECKS[d].cards.reduce((s, k) => s + CARDS[k].l, 0), 34, d + ': Link totale 34');
 });
 test('ogni mostro ha tante frecce quanto il suo Link Rating', () => {
   for(const [k, c] of Object.entries(CARDS)) if(!k.startsWith('t_')) assert.equal(c.ar.length, c.l, c.n);
@@ -429,4 +443,14 @@ test('anteprima: nessun risultato per mosse non valide (spazio occupato o blocca
   assert.deepEqual(E.previewTargets(st, 0, 5, at(2,0)), [], 'carta inesistente');
   assert.deepEqual(E.previewTargets(st, 0, 0, 99), [], 'spazio fuori dal campo');
   st.pending = {a:0, t:[1]}; assert.deepEqual(E.previewTargets(st, 0, 0, at(2,0)), [], 'c\'è una scelta in sospeso');
+});
+
+test('knownCards: riconosce gli stati che nominano carte sconosciute (salvataggi di prima del cambio di ID)', () => {
+  const st = game({board:{[at(2,1)]:['b',1]}, hands:[['a'],['b']]});
+  assert.equal(E.knownCards(st), true);
+  const vecchio = JSON.parse(JSON.stringify(st)); vecchio.hands[0] = ['monk']; assert.equal(E.knownCards(vecchio), false, 'carta in mano con la vecchia chiave');
+  const v2 = JSON.parse(JSON.stringify(st)); v2.board[at(2,1)].k = 'seaangel'; assert.equal(E.knownCards(v2), false, 'carta sul campo con la vecchia chiave');
+  const v3 = JSON.parse(JSON.stringify(st)); v3.piles = [['monk'], []]; assert.equal(E.knownCards(v3), false, 'carta nella pescata');
+  assert.equal(E.knownCards(null), false); assert.equal(E.knownCards({status:'lobby'}), true, 'sala di attesa: nessuna carta');
+  assert.equal(E.knownCards(E.newGame(['alba', 'tramonto'])), true, 'una partita nuova usa gli ID dei dati');
 });

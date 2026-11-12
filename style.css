@@ -50,9 +50,14 @@ input[type=text]{text-transform:uppercase;letter-spacing:.15em;width:8.5em;font-
 .row label{min-width:7.5em}
 .note{font-size:.92rem;color:var(--muted);margin-top:8px}
 .err{color:var(--danger);font-weight:600;margin-top:8px}
-.decklist{margin-top:16px;display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));align-items:start}	/* start: aprendo un mazzo l'altro resta alto quanto il suo titolo, non si stira */
+.decklist{margin-top:16px;display:grid;gap:16px;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}	/* sempre due colonne (con più mazzi vanno a capo, non si aggiungono colonne); start: aprendo un mazzo l'altro resta alto quanto il suo titolo, non si stira */
+@media (max-width:620px){.decklist{grid-template-columns:minmax(0,1fr)}}	/* su schermi stretti una colonna sola, altrimenti le carte diventano minuscole */
 .decklist details{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 16px}
 .decklist summary{font-family:'Chakra Petch',sans-serif;font-weight:600;cursor:pointer}
+.deck-chart{display:inline-flex;align-items:center;gap:6px;margin-left:10px;vertical-align:middle;font-family:'Barlow',sans-serif;font-weight:400;font-size:.8rem;color:var(--ink)}	/* nota accanto al nome, con l'istogramma dietro al testo */
+.dc{position:relative;display:inline-block;padding:2px 5px;line-height:1.3;white-space:nowrap}
+.dc-bar{position:absolute;left:0;right:0;bottom:0;height:calc(var(--h) * 1.45);border-radius:3px;background:color-mix(in srgb,var(--focus) 55%,transparent)}	/* altezza proporzionale (--h, in % dell'etichetta, fino a un po' sopra di essa): posizionata in modo assoluto, non cambia l'altezza del riquadro */
+.dc-lab{position:relative}	/* il testo sta sopra la barra */
 .decklist details{container-type:inline-size}	/* le carte si dimensionano sulla larghezza del riquadro del mazzo (unità cqw) */
 .minicards{display:grid;grid-template-columns:repeat(5,var(--cell));justify-content:start;gap:6px;margin-top:10px;--cell:min(110px, calc((100cqw - 24px) / 5))}	/* sempre 5 colonne (5x3): le carte occupano tutta la larghezza del riquadro (si ingrandiscono se c'è spazio, si rimpiccioliscono se è stretto), fino a un massimo di 110px */
 /* game */
@@ -99,23 +104,43 @@ input[type=text]{text-transform:uppercase;letter-spacing:.15em;width:8.5em;font-
 .card.c0{--pc:var(--p0)}	/* --pc = colore del controllore attuale */
 .card.c1{--pc:var(--p1)}
 .card.c0,.card.c1{border-color:var(--pc);background:color-mix(in srgb,var(--pc) 14%,var(--raised))}
+
+/* Illustrazione della carta: copre tutto il riquadro (sotto frecce e testo), con una vignettatura scura sui quattro lati (.art::after) perché il testo bianco e le frecce si leggano su qualunque immagine */
+.art {
+	position:absolute;
+	inset:0;
+	background-color:var(--cellbg);
+	background-size:cover;
+	background-position:center;
+	overflow:hidden
+}
+
+.art::after {
+	content:'';
+	position:absolute;
+	inset:0;
+	box-shadow:inset 0 0 50cqw/*sfumatura*/ 5cqw/*ombra massima dal bordo*/ rgba(0,0,0,.7)	/* ombra interna, in % della larghezza della carta */
+}
 .card svg{position:absolute;inset:0;width:100%;height:100%}
-.card svg.rot{transform:rotate(180deg)}
+.card svg.rot,.art.rot{transform:rotate(180deg)}	/* le frecce e l'illustrazione di una carta dell'avversario sono capovolte, il testo no */
 .card.turned{--r:180deg;transform:rotate(180deg)}
 .pinfo.turned{transform:rotate(180deg)}
 .card polygon{fill:var(--off)}
 .card.c0 polygon.on,.card.c1 polygon.on{fill:var(--pc)}
 .card.cn polygon.on{fill:var(--ink)}
-.cbody{position:absolute;inset:12% 11%;display:flex;flex-direction:column;justify-content:space-between;align-items:stretch}
+/* Le frecce attive devono staccarsi da qualunque illustrazione: contorno bianco sottile e un'ombra scura intorno (le spente restano discrete) */
+.card polygon.on{stroke:#fff;stroke-width:2;stroke-linejoin:round;paint-order:stroke;filter:drop-shadow(0 0 1.5px rgba(0,0,0,.95)) drop-shadow(0 0 3px rgba(0,0,0,.6))}
+.cbody{position:absolute;inset:13% 13%;display:flex;flex-direction:column;align-items:stretch;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.9)}
+.cbody .catk{margin-top:auto;margin-bottom:7cqw}	/* nome in alto, ATK e meta in basso: al centro resta visibile l'illustrazione; l'ATK è un po' sollevato per lasciare posto alla sfera dell'Attributo */
 .cname{font-size:10.5cqw;line-height:1.08;font-weight:600;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
 .catk{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:24cqw;line-height:1}
 .cmeta{display:flex;justify-content:space-between;align-items:center;font-family:'Chakra Petch',sans-serif;font-weight:600;font-size:10cqw}
-.attr-dot{display:inline-block;width:.8em;height:.8em;border-radius:50%;background:var(--ac);margin-right:6px;vertical-align:-.05em}	/* pallino dell'attributo nei dettagli carta (.adot dipende dalla larghezza della carta) */
+.attr-dot{display:inline-block;width:1.05em;height:1.05em;margin-right:5px;vertical-align:-.2em}	/* sfera dell'Attributo nei dettagli carta (.adot dipende dalla larghezza della carta) */
 .matchup{margin-left:6px;color:var(--muted)}
 .matchup .mu{white-space:nowrap;margin-right:8px;display:inline-block}	/* ▲ forte contro / ▼ debole contro, ognuno con pallino e nome dell'attributo; a capo solo tra un gruppo e l'altro */
 .matchup .mu:last-child{margin-right:0}	/* niente spazio tra l'ultimo gruppo e la parentesi chiusa */
 .matchup .attr-dot{margin-right:4px}
-.adot{display:inline-block;width:11cqw;height:11cqw;border-radius:50%;background:var(--ac)}
+.adot{display:inline-block;width:17cqw;height:17cqw;object-fit:contain;border-radius:50%;box-shadow:0 0 0 1px rgba(255,255,255,.9),0 0 2px 1px rgba(0,0,0,.55)}	/* sfera dell'Attributo sulla carta, con un bordino bianco (e un filo di ombra fuori) per staccarla dall'illustrazione */
 /* ===== Animazioni =====
    Le avvia la sequenza JavaScript della mossa (sezione "sequenza di animazione" nello script) aggiungendo queste classi al momento giusto:
    in CSS non ci sono ritardi. */
@@ -131,7 +156,7 @@ input[type=text]{text-transform:uppercase;letter-spacing:.15em;width:8.5em;font-
    si ingrandisce e si colora, resta così fino alla fine dell'affondo e poi torna al valore base */
 .catk.boost{--atk-n:var(--atk-from);counter-reset:atk var(--atk-n);color:transparent;position:relative;
 	animation:atkhold var(--boost-hold) linear,atkcount var(--boost-time) ease-out}
-.catk.boost::after{content:counter(atk);position:absolute;inset:0;color:var(--ink);
+.catk.boost::after{content:counter(atk);position:absolute;inset:0;color:#fff;
 	animation:boosthold var(--boost-hold) linear,boostpop var(--boost-time) ease-in-out}
 /* cattura: --d = verso (1 antiorario, -1 orario se la carta passa al Giocatore 2). Il colore e le frecce nuovi sono già applicati alla carta (setCardCtrl):
    la rotazione parte dall'orientamento vecchio (180° di differenza) e arriva a quello nuovo */
@@ -139,7 +164,7 @@ input[type=text]{text-transform:uppercase;letter-spacing:.15em;width:8.5em;font-
 .card.spin.p1{--d:-1}
 .card.spin:not(.face) .cbody{animation:unspin var(--spin-time) ease-in-out}	/* nel modo normale il testo resta sempre dritto (ruotano solo bordo e frecce): contro-rotazione del corpo carta; in modalità "carte verso chi le controlla" (.face) il testo ruota con la carta */
 
-@media (prefers-reduced-motion:reduce){.card.spin,.card.spin .cbody,.card.drop,.cell.target .card,.board.selnew .cell.target::after,.board.selnew .cell.attacker::after,.cell.lunge,.catk.boost,.catk.boost::after,.cell.blocked.fresh.hcard{transition:none}}
+@media (prefers-reduced-motion:reduce){.card.spin,.card.spin .cbody,.card.drop,.cell.target .card,.board.selnew .cell.target::after,.board.selnew .cell.attacker::after,.cell.lunge,.catk.boost,.catk.boost::after,.cell.blocked.fresh{animation:none}.hcard{transition:none}}
 /* panel */
 .panel{display:flex;flex-direction:column;gap:14px}
 .box{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
@@ -183,6 +208,7 @@ input[type=text]{text-transform:uppercase;letter-spacing:.15em;width:8.5em;font-
 .attrmap{display:block;width:100%;max-width:440px;height:auto;margin:6px 0}
 .am-line{stroke:var(--muted);stroke-width:1.8;stroke-linecap:round}
 .am-head{fill:var(--muted)}
+.am-ring{fill:none;stroke:rgba(255,255,255,.9);stroke-width:1}	/* bordino bianco intorno alla sfera nello schema */
 .am-node{fill:var(--raised);stroke-width:2}
 .am-text{fill:var(--ink);font-family:'Chakra Petch',sans-serif;font-weight:600;font-size:10.5px}
 .tools{display:flex;gap:8px;flex-wrap:wrap}
@@ -198,8 +224,8 @@ input[type=text]{text-transform:uppercase;letter-spacing:.15em;width:8.5em;font-
 @keyframes lift{50%{scale:1.12}}
 @keyframes atkcount{from{--atk-n:var(--atk-from)}to{--atk-n:var(--atk-to)}}	/* Aumento ATK */
 @keyframes atkhold{from,to{--atk-n:var(--atk-to)}}	/* Mantenimento del valore ATK aumentato */
-@keyframes boostpop{0%{scale:1;color:var(--ink)}55%{scale:1.5;color:var(--focus)}100%{scale:1.15;color:var(--focus)}}
-@keyframes boosthold{from,to{color:var(--focus);scale:1.15}}
+@keyframes boostpop{0%{scale:1;color:#fff}55%{scale:1.5;color:var(--luce)}100%{scale:1.15;color:var(--luce)}}
+@keyframes boosthold{from,to{color:var(--luce);scale:1.15}}
 /* affondo: la carta si solleva e scatta verso il bersaglio (ease-in: accelera fino all'impatto a metà), poi torna al suo posto (ease-out) */
 @keyframes lunge{
 	0%{translate:0 0;scale:1;animation-timing-function:ease-in}

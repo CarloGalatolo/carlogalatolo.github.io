@@ -525,3 +525,15 @@ test('spettatori: dopo il passaggio di host, lo spettatore si ricollega al nuovo
   const cs = specHello(env, hp, 'spec-1');
   assert.equal(online.specs.size, 1); assert.ok(msgs(cs, 'state').some(m => m.spec === true));
 });
+
+test('versione dei dati: stanza salvata con vecchie carte non si riprende; stato dell’host con carte sconosciute -> avviso, non un errore', () => {
+  const env = createNetEnv(), {ctx, online} = env;
+  const old = env.playState({turn:0}); old.hands[0] = ['monk'];
+  ctx.localStorage.setItem('linkgrid-room', JSON.stringify({at: ctx.fakeNow, code:'OLD11', hostId:'x', state: old}));
+  ctx.showResume(); assert.equal(ctx.$('resumeBox').hidden, true, 'non si offre');
+  ctx.resumeRoom(); assert.equal(env.peers.length, 0, 'e non si crea nessuna stanza');
+  const {conn} = env.asGuest(env.playState({turn:0}));
+  const bad = env.playState({turn:1}); bad.seq = 99; bad.hands[1] = ['monk'];
+  conn.emit('data', {type:'state', state: bad, force:true});
+  assert.match(ctx.flash, /versione diversa/); assert.equal(ctx.state.seq, 10, 'lo stato resta quello di prima');
+});

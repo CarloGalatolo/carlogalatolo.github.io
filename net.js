@@ -164,7 +164,7 @@ function joinAsGuest(code, restore){	// "Riprendi la stanza" dal menu, ma l'altr
   online.pendingState = restore;	// (dopo joinRoom: destroyPeer lo azzera)
 }
 function adoptNewer(d, id){	// l'altro ha giocato mentre l'host non lo vedeva (o la stanza ha cambiato host): si adotta il suo stato se è più recente e valido
-  if(!d || typeof d!=='object' || !state || state.status==='lobby' || d.code!==state.code || (d.seq||0) <= (state.seq||0)) return false;
+  if(!d || typeof d!=='object' || !knownCards(d) || !state || state.status==='lobby' || d.code!==state.code || (d.seq||0) <= (state.seq||0)) return false;
   const P = state.players, seat = P.s0 && P.s0.id===id ? 0 : P.s1 && P.s1.id===id ? 1 : null;
   if(seat===null || !d.players || !d.players.s0 || !d.players.s1 || d.players.s0.id!==P.s0.id || d.players.s1.id!==P.s1.id) return false;
   // valido solo se nello stato che ho il turno (o la scelta) era suo: cioè sono mosse che poteva fare
@@ -308,6 +308,7 @@ function guestConnect(){
     if(msg.type==='presence'){ online.presence = {on:msg.on, specs:msg.specs|0}; if(state) render(); return; }
     if(msg.type==='full'){ $('btnJoin').disabled = false; $('onlineNote').textContent = ONLINE_NOTE; destroyPeer(); if(mode===Mode.ONLINE) exitToMenu(); menuError('La stanza è già piena.'); return; }
     if(msg.type==='state' && msg.state){
+      if(!knownCards(msg.state)){ versionMismatch(); return; }
       gotState = true; clearInterval(helloTimer); online.joinTry = 0; clearTimeout(online.retry); clearTimeout(online.takeTimer);
       online.hostLeft = false; online.pendingState = null;
       online.spec = !!msg.spec; clearTimeout(online.specTimer); online.specTimer = 0;
@@ -327,6 +328,11 @@ function guestConnect(){
     linkLost(c);
   });
   c.on('error', ()=>{});
+}
+function versionMismatch(){	// lo stato dell'host nomina carte che questa pagina non conosce: l'altro ha una versione diversa del gioco (o questa pagina è vecchia)
+  const msg = 'La stanza usa una versione diversa del gioco: ricarica la pagina (Ctrl+F5) e riprova.';
+  if(mode===Mode.ONLINE){ flash = msg; render(); return; }
+  $('btnJoin').disabled = false; $('onlineNote').textContent = ONLINE_NOTE; destroyPeer(); menuError(msg);
 }
 function applyRemote(d, force){
   if(!d) return;
@@ -428,7 +434,7 @@ function saveRoom(){	// l'host salva la stanza a ogni cambiamento di stato (la t
 function showResume(){
   const box = $('resumeBox'); if(!box) return;
   const r = loadSaved(ROOM_KEY);
-  if(!r || !r.state || !r.code){ box.hidden = true; box.innerHTML = ''; return; }
+  if(!r || !r.state || !r.code || !knownCards(r.state)){ box.hidden = true; box.innerHTML = ''; return; }
   const what = r.state.status==='lobby' ? 'in sala d’attesa' : r.state.status==='over' ? 'partita finita' : 'partita in corso';
   box.hidden = false;
   box.innerHTML = `<div>Hai lasciato la stanza <b>${esc(r.code)}</b> (${what}). Riprendila: l’altro giocatore, se è ancora collegato, rientra da solo.</div>`+
@@ -437,7 +443,7 @@ function showResume(){
 function forgetRoom(){ try{ localStorage.removeItem(ROOM_KEY); }catch{} savedSeq = -1; showResume(); }
 function resumeRoom(){
   const r = loadSaved(ROOM_KEY);
-  if(!r || !r.state){ showResume(); return; }
+  if(!r || !r.state || !knownCards(r.state)){ showResume(); return; }
   if(typeof Peer==='undefined') return;
   online.myId = r.hostId; try{ sessionStorage.setItem('linkgrid-id', r.hostId); }catch{}	// stesso id di prima: il posto 1 della stanza è ancora il suo
   savedSeq = -1;

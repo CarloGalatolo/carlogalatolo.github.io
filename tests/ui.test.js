@@ -66,7 +66,7 @@ test('mano: il bordo unico compare solo quando il giocatore di turno deve scegli
 
 test('dettagli carta: attributo con pallino e nome, forte/debole contro, frecce con i simboli', () => {
   const env = createUiEnv();
-  env.show({state: env.playState(0), inspected: 'monk'});   // Monk of the Tenyi: TERRA, freccia giù
+  env.show({state: env.playState(0), inspected: '32519092'});   // Monk of the Tenyi: TERRA, freccia giù
   const h = env.el('insp').innerHTML;
   assert.match(h, /<dt>Attributo<\/dt>/); assert.match(h, /class="attr-dot"/); assert.match(h, /class="attr-name">TERRA</);
   assert.match(h, /Forte contro ACQUA/); assert.match(h, /Debole contro VENTO/);   // (TERRA batte ACQUA, ed è battuto da VENTO)
@@ -124,7 +124,7 @@ test('scorrimento: online, quando la partita inizia si centra il campo; in sala 
 
 test('ultima mossa: le carte che hanno cambiato lato si segnano, quelle tornate come prima no', () => {
   const env = createUiEnv();
-  const st = env.playState(1); st.board[5] = {k:'monk', o:1, c:0}; st.board[6] = {k:'monk', o:1, c:1}; st.board[7] = {k:'monk', o:0, c:0};
+  const st = env.playState(1); st.board[5] = {k:'32519092', o:1, c:0}; st.board[6] = {k:'32519092', o:1, c:1}; st.board[7] = {k:'32519092', o:0, c:0};
   st.last = {placed:7, from:{5:1, 6:1}};   // la 5 era dell'altro giocatore (ora è cambiata), la 6 è com'era
   env.show({state: st});
   const h = env.el('board').innerHTML;
@@ -136,7 +136,7 @@ test('ultima mossa: le carte che hanno cambiato lato si segnano, quelle tornate 
 
 test('anteprima: con una carta scelta, lo spazio sotto il cursore dà i mostri avversari che attaccherebbe (solo se si può agire)', () => {
   const env = createUiEnv();
-  const st = env.playState(0); st.hands[0] = ['monk']; st.board[7] = {k:'monk', o:1, c:1};   // Monk (freccia giù): in 2 attacca 7
+  const st = env.playState(0); st.hands[0] = ['32519092']; st.board[7] = {k:'32519092', o:1, c:1};   // Monk (freccia giù): in 2 attacca 7
   env.show({state: st, selHand: 0});
   const over = i => env.run(`previewOf({closest: () => ({dataset: {i: '${i}'}})})`);
   assert.deepEqual(Array.from(over(2)), [7]); assert.deepEqual(Array.from(over(0)), []);
@@ -196,4 +196,64 @@ test('accessibilità: le nuove righe del registro si annunciano (solo quelle nuo
   env.show({state: c, mode:'online', mySeat:0}); assert.equal(env.el('logLive').textContent, 'terza');
   const d = env.playState(0, 13); d.log = ['x', 'y', 'z']; d.logCount = 5;   // (il registro è dal più recente: x è l'ultima)
   env.show({state: d, mode:'online', mySeat:0}); assert.equal(env.el('logLive').textContent, 'y x', 'due righe nuove insieme: si leggono in ordine cronologico (la più vecchia prima)');
+});
+
+test('partita locale salvata con le vecchie chiavi delle carte: non si offre di riprenderla', () => {
+  const env = createUiEnv();
+  const st = env.playState(0); st.hands[0] = ['monk'];
+  env.run(`localStorage.setItem(LOCAL_KEY, JSON.stringify({at: Date.now(), state: ${JSON.stringify(st)}, view: 0, face: false})); showLocalResume();`);
+  assert.equal(env.el('localResume').hidden, true);
+  env.run('resumeLocal()'); assert.equal(env.run('mode'), null, 'resumeLocal non parte');
+});
+
+test('carte: ogni carta mostra la sua illustrazione locale sotto frecce e testo', () => {
+  const env = createUiEnv();
+  const st = env.playState(0); st.board[7] = {k:'32519092', o:1, c:1};
+  env.show({state: st});
+  assert.match(env.el('board').innerHTML, /<span class="art( rot)?" style="background-image:url\(img\/cards\/32519092\.jpg\)"><\/span><svg/, 'illustrazione prima delle frecce (che restano sopra)');
+  assert.match(env.el('handBottom').innerHTML, /img\/cards\/\d{8}\.jpg/, 'anche le carte in mano');
+});
+
+test('carte: l’illustrazione segue le frecce (capovolta per le carte dell’avversario di chi guarda)', () => {
+  const env = createUiEnv();
+  const st = env.playState(0); st.board[6] = {k:'32519092', o:0, c:0}; st.board[7] = {k:'32519092', o:1, c:1};
+  env.show({state: st});   // locale, vista del Giocatore 1
+  const cell = i => env.el('board').innerHTML.split('<button').find(b => b.includes(`data-i="${i}"`)) || '';
+  assert.match(cell(7), /class="art rot"/); assert.match(cell(7), /<svg[^>]*class="rot"/, 'come le frecce');
+  assert.doesNotMatch(cell(6), /class="art rot"/); assert.doesNotMatch(cell(6), /<svg[^>]*class="rot"/);
+});
+
+test('home: accanto al nome di ogni mazzo, per ogni valore di Link presente c’è l’etichetta ("4×L1") con la barra dietro, nella stessa scala per tutti i mazzi', () => {
+  const env = createUiEnv();
+  const h = env.el('deckPreview').innerHTML;
+  const cols = name => [...h.split('<details').find(d => d.includes('Mazzo ' + name)).matchAll(/<span class="dc" title="Link (\d): (\d+) mostri"><span class="dc-bar" style="--h:(\d+)%"><\/span><span class="dc-lab">([^<]*)<\/span>/g)]
+    .map(m => ({link: +m[1], n: +m[2], h: +m[3], lab: m[4]}));
+  const alba = cols('Alba'), mezz = cols('Mezzogiorno'), notte = cols('Mezzanotte');
+  assert.deepEqual(alba.map(c => c.lab), ['4×L1', '5×L2', '4×L3', '2×L4']);
+  assert.deepEqual(mezz.map(c => c.lab), ['11×L2', '4×L3'], 'solo i valori presenti, come le etichette della nota');
+  assert.deepEqual(notte.map(c => c.lab), ['8×L1', '2×L3', '5×L4']);
+  assert.equal(mezz[0].h, Math.max(...[...alba, ...mezz, ...notte].map(c => c.h)), 'la barra più alta in assoluto è quella di 11 mostri');
+  assert.ok(mezz[0].h > alba[1].h, 'stessa scala tra mazzi: 11 mostri sono più alti di 5');
+  assert.equal(alba[0].h, alba[2].h, 'Alba: 4 e 4 hanno la stessa altezza'); assert.ok(alba[0].h > alba[3].h, 'più alte di 2');
+  assert.equal(env.run('deckChart({cards: []})'), '', 'mazzo vuoto: niente');
+});
+
+test('Attributi: carte e dettagli mostrano la sfera dell’Attributo (immagine locale) al posto del pallino colorato', () => {
+  const env = createUiEnv();
+  const st = env.playState(0); st.board[7] = {k:'32519092', o:1, c:1};   // Monk of the Tenyi: TERRA
+  env.show({state: st, inspected: '32519092'});
+  assert.match(env.el('board').innerHTML, /<img class="adot" src="img\/attributes\/TERRA\.svg" alt="" title="TERRA">/);
+  const h = env.el('insp').innerHTML;
+  assert.match(h, /<img class="attr-dot" src="img\/attributes\/TERRA\.svg"/, 'Attributo della carta');
+  assert.match(h, /<img class="attr-dot" src="img\/attributes\/ACQUA\.svg"/, 'forte contro');
+  assert.match(h, /<img class="attr-dot" src="img\/attributes\/VENTO\.svg"/, 'debole contro');
+  assert.doesNotMatch(env.el('board').innerHTML + h, /--ac:/, 'niente più pallini colorati');
+});
+
+test('regole: lo schema dei vantaggi di Attributo usa le sfere ufficiali (una per Attributo) con il bordino bianco, non più i cerchi colorati', () => {
+  const env = createUiEnv();
+  const h = env.el('rulesMenu').innerHTML;
+  for(const a of ['FUOCO', 'ACQUA', 'VENTO', 'TERRA', 'LUCE', 'OSCURITA']) assert.match(h, new RegExp(`<image href="img/attributes/${a}\.svg"`), a);
+  assert.equal((h.match(/class="am-ring"/g) || []).length, 6, 'un bordino per sfera');
+  assert.doesNotMatch(h, /<circle[^>]*style="fill:/, 'niente più cerchi colorati');
 });

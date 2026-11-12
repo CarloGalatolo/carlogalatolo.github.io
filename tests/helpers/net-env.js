@@ -7,6 +7,9 @@ const vm = require('node:vm');
 
 const ROOT = path.join(__dirname, '..', '..');
 const read = f => fs.readFileSync(path.join(ROOT, f), 'utf-8');
+// Nel browser i dati (cards.json, decks.json) li prepara loader.js in GAME_DATA prima di caricare engine.js: qui si fa lo stesso (rileggendoli nel contesto,
+// così oggetti e array sono dello stesso "mondo" del codice che li usa)
+const loadGameData = ctx => vm.runInContext(`var GAME_DATA = {cards: ${read('cards.json')}, decks: ${read('decks.json')}};`, ctx, {filename: 'GAME_DATA'});
 
 // Tutto ciò che i test devono raggiungere da fuori è dichiarato con `var`/`function` (diventa proprietà del contesto).
 const PRELUDE = `
@@ -67,6 +70,7 @@ function commit(fn){
 function createNetEnv(){
   const ctx = vm.createContext({console, structuredClone});
   vm.runInContext(PRELUDE, ctx, {filename: 'prelude'});
+  loadGameData(ctx);
   vm.runInContext(read('engine.js'), ctx, {filename: 'engine.js'});
   vm.runInContext(COMMIT, ctx, {filename: 'commit'});
   vm.runInContext(read('net.js'), ctx, {filename: 'net.js'});
@@ -111,4 +115,4 @@ function createNetEnv(){
   return env;
 }
 
-module.exports = {createNetEnv, read, ROOT};
+module.exports = {createNetEnv, read, loadGameData, ROOT};

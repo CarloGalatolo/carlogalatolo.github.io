@@ -23,6 +23,8 @@
     <button class="btn" id="btnExit" hidden>Torna al menu</button>
   </header>
 
+  <p class="err" id="loadError" hidden></p>
+
   <main id="menu">
     <div class="menu">
 		<section>
@@ -46,8 +48,8 @@
 		</section>
 		</div>
 		<div class="rulesrow">
-			<div class="box rules" id="rulesMenu"></div>
 			<div class="box rules" id="rulesSetup"></div>
+			<div class="box rules" id="rulesMenu"></div>
 		</div>
 		<div class="decklist" id="deckPreview"></div>
 	</main>
@@ -71,8 +73,6 @@
   </main>
   
 </div>
-<script src="engine.js"></script>
-<script src="net.js"></script>
-<script src="graphics.js"></script>
+<script src="loader.js"></script>
 </body>
 </html>

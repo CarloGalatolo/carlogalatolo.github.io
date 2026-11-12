@@ -5,6 +5,7 @@ const ARROW_POLY = {
   T:'38,8 50,1 62,8', B:'38,92 50,99 62,92', L:'8,38 1,50 8,62', R:'92,38 99,50 92,62',
   TL:'2,16 2,2 16,2', TR:'84,2 98,2 98,16', BL:'2,84 2,98 16,98', BR:'98,84 98,98 84,98'
 };
+const attrImg = at => `img/attributes/${at}.svg`;	// sfera dell'Attributo (file locale, vedi README)
 const ATTR_VAR = {FUOCO:'--fuoco',ACQUA:'--acqua',VENTO:'--vento',TERRA:'--terra',LUCE:'--luce',OSCURITA:'--oscurita'};
 function esc(s){ return String(s).replace(/[&<>"]/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])); }
 
@@ -15,9 +16,10 @@ function cardHTML(k, ctrl, rot, extra=''){
   const face = faceMode && mode===Mode.LOCAL;   // modalità "carte verso chi le controlla"
   const turned = rot && face;
   return `<span class="card ${cls} ${turned?'turned':''} ${face?'face':''} ${extra}" data-k="${k}">`+
+    `<span class="art ${rot&&!turned?'rot':''}" style="background-image:url(img/cards/${k}.jpg)"></span>`+	// illustrazione (ritagliata), file locale img/cards/<ID>.jpg
     `<svg viewBox="0 0 100 100" class="${rot&&!turned?'rot':''}" aria-hidden="true">${polys}</svg>`+
     `<span class="cbody"><span class="cname">${esc(C.n)}</span><span class="catk">${C.a}</span>`+
-    `<span class="cmeta"><span class="adot" style="--ac:var(${ATTR_VAR[C.at]})" title="${ATTR_LABEL[C.at]}"></span><span>L${C.l}</span></span></span></span>`;
+    `<span class="cmeta"><img class="adot" src="${attrImg(C.at)}" alt="" title="${ATTR_LABEL[C.at]}"><span>L${C.l}</span></span></span></span>`;
 }
 const DIR_IT = {T:'su',B:'giù',L:'sinistra',R:'destra',TL:'su a sinistra',TR:'su a destra',BL:'giù a sinistra',BR:'giù a destra'};
 const DIR_ARROW = {T:'↑',B:'↓',L:'←',R:'→',TL:'↖',TR:'↗',BL:'↙',BR:'↘'};
@@ -160,6 +162,7 @@ function setCardCtrl(i, ctrl){	// cambia in loco colore e frecce di una carta (s
   card.classList.remove('c0','c1','cn'); card.classList.add(ctrl===0 ? 'c0' : 'c1');
   card.classList.toggle('turned', turned);
   const svg = card.querySelector('svg'); if(svg) svg.classList.toggle('rot', rot && !turned);
+  card.querySelector('.art')?.classList.toggle('rot', rot && !turned);	// l'illustrazione segue le frecce
   const m = /^(colonna \d+, riga \d+)/.exec(cell.getAttribute('aria-label') || '');
   if(m) cell.setAttribute('aria-label', `${m[1]}, ${seatName(ctrl)}: ${cardLabel(card.dataset.k)}`);
 }
@@ -411,7 +414,7 @@ function lobbyHTML(){
   return h;
 }
 
-const attrTag = at => `<span class="attr-dot" style="--ac:var(${ATTR_VAR[at]})" title="${ATTR_LABEL[at]}"></span><span class="attr-name">${ATTR_LABEL[at]}</span>`;	// pallino colorato + nome dell'attributo
+const attrTag = at => `<img class="attr-dot" src="${attrImg(at)}" alt="" title="${ATTR_LABEL[at]}"><span class="attr-name">${ATTR_LABEL[at]}</span>`;	// pallino colorato + nome dell'attributo
 const weakTo = at => Object.keys(BEATS).find(x => BEATS[x]===at);	// l'attributo che batte at
 // "forte/debole contro" in forma compatta: freccia (▲ vantaggio, ▼ svantaggio) + pallino e nome dell'attributo; il titolo (passando sopra) dice cosa significa la freccia
 const matchDot = (sym, what, at) => `<span class="mu" title="${what} ${ATTR_LABEL[at]}"><span role="img" aria-label="${what}">${sym}</span>${attrTag(at)}</span>`;
@@ -532,14 +535,14 @@ function saveLocal(){	// a ogni mossa (e a ogni cambio di vista); a partita fini
 function forgetLocal(quiet){ try{ localStorage.removeItem(LOCAL_KEY); }catch{} if(!quiet) showLocalResume(); }
 function showLocalResume(){
   const box = $('localResume'), r = loadSaved(LOCAL_KEY);
-  if(!r || !r.state || (r.state.status!=='play' && r.state.status!=='setup')){ box.hidden = true; box.innerHTML = ''; return; }
+  if(!r || !r.state || !knownCards(r.state) || (r.state.status!=='play' && r.state.status!=='setup')){ box.hidden = true; box.innerHTML = ''; return; }
   const st = r.state, free = st.board ? st.board.filter(x=>x===null).length : 0;
   box.hidden = false;
   box.innerHTML = `<div>Hai lasciato una partita a metà (${st.status==='setup' ? 'preparazione del campo' : `turno di ${esc(pName(st.turn))}, ${free} spazi liberi`}).</div>`+
     `<div class="row"><button class="btn primary" id="btnResumeLocal">Riprendi la partita</button><button class="btn" id="btnForgetLocal">Dimentica</button></div>`;
 }
 function resumeLocal(){
-  const r = loadSaved(LOCAL_KEY); if(!r || !r.state){ showLocalResume(); return; }
+  const r = loadSaved(LOCAL_KEY); if(!r || !r.state || !knownCards(r.state)){ showLocalResume(); return; }
   mode = Mode.LOCAL; mySeat = null; localView = r.view===1 ? 1 : 0; faceMode = !!r.face; selHand = null; inspected = null; flash = ''; logSpoken = null;
   state = Object.assign({}, r.state, {fx:null, sfx:null});
   showGame(); render();
@@ -581,9 +584,25 @@ function exitToMenu(){
 
 
 // ---------- boot ----------
+// Quanti mostri ci sono per ogni valore di Link nel mazzo (solo i valori presenti), per esempio "Link 1: 4 · Link 2: 5 · Link 3: 4 · Link 4: 2"
+function linkCounts(d){
+  const n = {};
+  for(const k of d.cards) n[CARDS[k].l] = (n[CARDS[k].l] || 0) + 1;
+  return n;
+}
+// Nota accanto al nome del mazzo, con l'istogramma in sovrimpressione: ogni valore di Link presente ha la sua etichetta (per esempio "4×L1") e, dietro, una barra alta
+// in proporzione al numero di mostri (in % dell'altezza dell'etichetta, con un po' di margine verso l'alto: è posizionata in modo assoluto, quindi la riga non cresce). Scala comune a tutti i mazzi: il valore più alto in assoluto.
+const HISTO_MAX = Math.max(...Object.values(DECKS).flatMap(d=>Object.values(linkCounts(d))));
+function deckChart(d){
+  const n = linkCounts(d);
+  return Object.keys(n).sort().map(l=>{
+    const pct = Math.max(12, Math.round(n[l]/HISTO_MAX*100));
+    return `<span class="dc" title="Link ${l}: ${n[l]} mostri"><span class="dc-bar" style="--h:${pct}%"></span><span class="dc-lab">${n[l]}×L${l}</span></span>`;
+  }).join('');
+}
 function deckOptions(sel){ return Object.entries(DECKS).map(([k,d])=>`<option value="${k}" ${k===sel?'selected':''}>${d.name}</option>`).join(''); }
 $('ld0').innerHTML = deckOptions('alba'); $('ld1').innerHTML = deckOptions('tramonto'); $('od').innerHTML = deckOptions('alba');
-$('deckPreview').innerHTML = Object.values(DECKS).map(d=>`<details><summary>Mazzo ${d.name}</summary><div class="minicards">${d.cards.map(k=>cardHTML(k,null,false)).join('')}</div></details>`).join('');
+$('deckPreview').innerHTML = Object.values(DECKS).map(d=>`<details open><summary>Mazzo ${d.name} <span class="deck-chart">${deckChart(d)}</span></summary><div class="minicards">${d.cards.map(k=>cardHTML(k,null,false)).join('')}</div></details>`).join('');
 
 // Schema dei vantaggi di Attributo (SVG, generato da BEATS): ogni freccia va da chi ha il vantaggio a chi lo subisce.
 function attrDiagram() {
@@ -604,8 +623,9 @@ function attrDiagram() {
   const nodes = Object.keys(POS).map(a=>{
     const [x,y] = POS[a], c = `var(${ATTR_VAR[a]})`;
     return `<rect x="${x-W/2}" y="${y-H/2}" width="${W}" height="${H}" rx="${H/2}" class="am-node" style="stroke:${c}"/>`+
-      `<circle cx="${x-W/2+14}" cy="${y}" r="5" style="fill:${c}"/>`+
-      `<text x="${x-W/2+25}" y="${y+4}" class="am-text">${ATTR_LABEL[a]}</text>`;
+      `<image href="${attrImg(a)}" x="${x-W/2+5}" y="${y-9}" width="18" height="18"/>`+	// sfera ufficiale dell'Attributo (era un cerchio colorato)
+      `<circle cx="${x-W/2+14}" cy="${y}" r="9" class="am-ring"/>`+
+      `<text x="${x-W/2+27}" y="${y+4}" class="am-text">${ATTR_LABEL[a]}</text>`;
   }).join('');
   const alt = Object.entries(BEATS).map(([a,b])=>`${ATTR_LABEL[a]} batte ${ATTR_LABEL[b]}`).join('; ');
   return `<svg class="attrmap" viewBox="0 0 400 150" role="img" aria-label="Vantaggi di Attributo: ${alt}">${arrows}${nodes}</svg>`;

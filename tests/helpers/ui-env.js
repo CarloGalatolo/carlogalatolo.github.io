@@ -2,7 +2,7 @@
 // Ambiente per provare graphics.js (l'interfaccia) senza browser: carica i tre file veri (engine.js, net.js, graphics.js) in un contesto isolato con un DOM
 // "finto" che si limita a ricordare ciò che gli viene scritto (innerHTML, classi, stili), così i test possono controllare cosa mostrerebbe l'interfaccia.
 const vm = require('node:vm');
-const {read} = require('./net-env.js');
+const {read, loadGameData} = require('./net-env.js');
 
 class FakeEl {
   constructor(id){
@@ -44,6 +44,7 @@ function createUiEnv(){
     requestAnimationFrame: f => { rafQueue.push(f); return rafQueue.length; }
   });
   // (niente Peer: initOnline mostra il messaggio "libreria non caricata", che qui non interessa)
+  loadGameData(ctx);
   for(const f of ['engine.js', 'net.js', 'graphics.js']) vm.runInContext(read(f), ctx, {filename: f});
   const env = {ctx, els, el: id => document.getElementById(id), flushRaf(){ while(rafQueue.length) rafQueue.shift()(); }};
   env.run = code => vm.runInContext(code, ctx);   // valuta nel contesto (per let/const di graphics.js: state, mode, selHand…)
