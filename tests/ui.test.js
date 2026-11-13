@@ -257,3 +257,22 @@ test('regole: lo schema dei vantaggi di Attributo usa le sfere ufficiali (una pe
   assert.equal((h.match(/class="am-ring"/g) || []).length, 6, 'un bordino per sfera');
   assert.doesNotMatch(h, /<circle[^>]*style="fill:/, 'niente più cerchi colorati');
 });
+
+test('mazzo casuale: "Casuale" è l’ultima opzione dei menu, preselezionata solo per il gioco online; in locale restano Alba e Tramonto', () => {
+  const env = createUiEnv();
+  const last = html => [...html.matchAll(/<option value="([^"]*)"/g)].pop()[1];
+  const selected = html => (html.match(/<option value="([^"]*)" selected/) || [])[1];
+  for(const id of ['ld0', 'ld1', 'od']){ assert.equal(last(env.el(id).innerHTML), 'random', id + ': l’ultima opzione è "Casuale"'); assert.match(env.el(id).innerHTML, />Casuale<\/option>/); }
+  assert.equal(selected(env.el('ld0').innerHTML), 'alba'); assert.equal(selected(env.el('ld1').innerHTML), 'tramonto');
+  assert.equal(selected(env.el('od').innerHTML), 'random', 'online: preselezionata');
+  env.show({state: {...env.playState(0), status:'lobby', code:'ROOMX'}, mode:'online', mySeat:0, host:true});
+  assert.doesNotMatch(env.el('extraBox').innerHTML, /value="random"/, 'nella sala d’attesa il mazzo è già sorteggiato: niente "Casuale"');
+});
+
+test('mazzo casuale: scegliendola in una partita locale, il mazzo si sorteggia all’avvio e non resta "random"', () => {
+  const env = createUiEnv();
+  env.el('ld0').value = 'random'; env.el('ld1').value = 'random';
+  env.run('startLocal()');
+  const decks = JSON.parse(env.run('JSON.stringify([state.players.s0.deck, state.players.s1.deck])'));
+  for(const d of decks) assert.ok(['alba', 'tramonto', 'mezzogiorno', 'mezzanotte'].includes(d), d + ' è un mazzo vero');
+});

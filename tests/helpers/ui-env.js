@@ -41,6 +41,7 @@ function createUiEnv(){
     localStorage: {getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; }},
     sessionStorage: {getItem: () => null, setItem(){}},
     setTimeout: () => 0, clearTimeout(){}, setInterval: () => 0, clearInterval(){},
+    performance: {now: () => Date.now()},
     requestAnimationFrame: f => { rafQueue.push(f); return rafQueue.length; }
   });
   // (niente Peer: initOnline mostra il messaggio "libreria non caricata", che qui non interessa)

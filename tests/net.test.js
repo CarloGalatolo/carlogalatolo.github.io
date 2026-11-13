@@ -537,3 +537,15 @@ test('versione dei dati: stanza salvata con vecchie carte non si riprende; stato
   conn.emit('data', {type:'state', state: bad, force:true});
   assert.match(ctx.flash, /versione diversa/); assert.equal(ctx.state.seq, 10, 'lo stato resta quello di prima');
 });
+
+test('mazzo casuale: creando o entrando in una stanza con "Casuale" il mazzo si sorteggia subito e non viene mai inviato come "random"', () => {
+  const env = createNetEnv(), {ctx, online} = env;
+  ctx.$('od').value = 'random';
+  const peer = env.hostRoom();
+  const ids = ['alba', 'tramonto', 'mezzogiorno', 'mezzanotte'];
+  assert.ok(ids.includes(ctx.state.players.s0.deck), 'host: ' + ctx.state.players.s0.deck);
+  const env2 = createNetEnv();
+  env2.ctx.$('joinCode').value = 'ROOMX'; env2.ctx.$('od').value = 'random';
+  env2.ctx.joinRoom();
+  assert.ok(ids.includes(env2.online.deck), 'ospite: ' + env2.online.deck);
+});

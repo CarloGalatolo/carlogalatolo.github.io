@@ -188,11 +188,11 @@ function createRoom(tries=0, resume=null, restore=null, takeover=false){
     mode = Mode.ONLINE; mySeat = 0;
     if(restore){	// stanza ripresa dal salvataggio (vedi resumeRoom): stesso stato di prima, l'ospite si ricollega da solo
       state = structuredClone(restore); state.fx = null; state.sfx = null; state.seq = (state.seq||0) + 1;
-      if(seatFromState()===null){ state.players = state.players || {}; state.players.s0 = {id:online.myId, deck:(state.players.s0 && state.players.s0.deck) || $('od').value}; }
+      if(seatFromState()===null){ state.players = state.players || {}; state.players.s0 = {id:online.myId, deck:(state.players.s0 && state.players.s0.deck) || resolveDeck($('od').value)}; }
       mySeat = seatFromState() ?? 0;	// (dopo un passaggio di host può essere il Giocatore 2)
       $('onlineNote').textContent = ONLINE_NOTE;
     } else {
-      state = {v:1, seq:1, code, status:'lobby', players:{s0:{id:online.myId, deck:$('od').value}, s1:null}, log:[]};
+      state = {v:1, seq:1, code, status:'lobby', players:{s0:{id:online.myId, deck:resolveDeck($('od').value)}, s1:null}, log:[]};
     }
     attach(code);
   });
@@ -388,7 +388,7 @@ function joinRoom(asSpectator){
   if(typeof Peer==='undefined') return;
   $('btnJoin').disabled = true;
   destroyPeer();
-  online.host = false; online.code = code; online.deck = $('od').value; online.joinTry = 0;
+  online.host = false; online.code = code; online.deck = resolveDeck($('od').value); online.joinTry = 0;
   online.spec = asSpectator===undefined ? !!($('specOpt') && $('specOpt').checked) : !!asSpectator;	// (dopo destroyPeer, che lo azzera) casella "spettatore"; se la stanza è piena lo si diventa comunque
   const g = loadSaved(GUEST_KEY);	// stesso id dell'ultima volta in questa stanza: si riprende il proprio posto anche da una scheda nuova
   if(g && g.code===code && g.id){ online.myId = g.id; try{ sessionStorage.setItem('linkgrid-id', g.id); }catch{} }

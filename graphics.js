@@ -553,7 +553,7 @@ applyTheme(prefGet('theme', 'auto')); $('faceOpt').checked = !!prefGet('face', f
 function startLocal(){
   mode = Mode.LOCAL; mySeat = null; localView = 0; selHand = null; inspected = null; flash='';
   faceMode = $('faceOpt').checked; prefSet('face', faceMode);
-  state = {seq:0, status:'lobby', players:{s0:{deck:$('ld0').value}, s1:{deck:$('ld1').value}}};
+  state = {seq:0, status:'lobby', players:{s0:{deck:resolveDeck($('ld0').value)}, s1:{deck:resolveDeck($('ld1').value)}}};
   showGame(); startMatch();
 }
 function startMatch(){
@@ -600,8 +600,13 @@ function deckChart(d){
     return `<span class="dc" title="Link ${l}: ${n[l]} mostri"><span class="dc-bar" style="--h:${pct}%"></span><span class="dc-lab">${n[l]}×L${l}</span></span>`;
   }).join('');
 }
-function deckOptions(sel){ return Object.entries(DECKS).map(([k,d])=>`<option value="${k}" ${k===sel?'selected':''}>${d.name}</option>`).join(''); }
-$('ld0').innerHTML = deckOptions('alba'); $('ld1').innerHTML = deckOptions('tramonto'); $('od').innerHTML = deckOptions('alba');
+// Con withRandom l'opzione "Casuale" è l'ultima: nei menu di partenza c'è sempre, ma è preselezionata solo per il gioco online (in locale restano Alba e Tramonto);
+// nella sala d'attesa non c'è (il mazzo è già stato sorteggiato quando si entra)
+function deckOptions(sel, withRandom){
+  const random = withRandom ? `<option value="${RANDOM_DECK}" ${sel===RANDOM_DECK?'selected':''}>Casuale</option>` : '';
+  return Object.entries(DECKS).map(([k,d])=>`<option value="${k}" ${k===sel?'selected':''}>${d.name}</option>`).join('') + random;
+}
+$('ld0').innerHTML = deckOptions('alba', true); $('ld1').innerHTML = deckOptions('tramonto', true); $('od').innerHTML = deckOptions(RANDOM_DECK, true);
 $('deckPreview').innerHTML = Object.values(DECKS).map(d=>`<details open><summary>Mazzo ${d.name} <span class="deck-chart">${deckChart(d)}</span></summary><div class="minicards">${d.cards.map(k=>cardHTML(k,null,false)).join('')}</div></details>`).join('');
 
 // Schema dei vantaggi di Attributo (SVG, generato da BEATS): ogni freccia va da chi ha il vantaggio a chi lo subisce.

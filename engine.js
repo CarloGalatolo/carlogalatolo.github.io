@@ -15,6 +15,10 @@ let rng = Math.random;
 function setRng(f){ rng = f || Math.random; }
 function d6(){ return 1 + Math.floor(rng()*6); }
 function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(rng()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+// Mazzo casuale: nei menu a tendina è l'opzione "random"; si sorteggia (con lo stesso generatore del motore, quindi ripetibile nei test) quando la partita o la stanza viene creata
+const RANDOM_DECK = 'random';
+function randomDeck(){ const ids = Object.keys(DECKS); return ids[Math.floor(rng()*ids.length)]; }
+function resolveDeck(id){ return id===RANDOM_DECK ? randomDeck() : id; }
 function pName(s){ return 'Giocatore ' + (s+1); }
 // Il registro è condiviso tra i due giocatori, ma ognuno deve leggerlo dal proprio punto di vista ("Tu vinci" / "L'avversario vince"): il motore scrive
 // segnaposto e fmtMsg() li traduce al momento di mostrarli. {pN} = giocatore N come soggetto, {paN} = "a" + giocatore N, {vN:terza|seconda} = verbo
@@ -224,6 +228,6 @@ function formatLog(m, view){
 
 if(typeof module !== 'undefined' && module.exports){
 	module.exports = {CARDS, DECKS, BEATS, ATTR_LABEL, DIRV, BONUS, setRng, d6, shuffle, pName, addLog, tp, tpa, tv, vecs, colToC, rowToR, colNum, rowNum,
-		newGame, blockCell, advanceSetup, setupOptions, chooseSetup, targetsOf, Place, runCapture, chooseTarget, ResolveAttack, score, endTurn, previewTargets, knownCards,
+		newGame, blockCell, advanceSetup, setupOptions, chooseSetup, targetsOf, Place, runCapture, chooseTarget, ResolveAttack, score, endTurn, previewTargets, knownCards, RANDOM_DECK, randomDeck, resolveDeck,
 		actingSeat, applyMove, whoName, formatLog};
 }

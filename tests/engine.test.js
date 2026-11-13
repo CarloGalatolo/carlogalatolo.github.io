@@ -460,3 +460,15 @@ test('knownCards: riconosce gli stati che nominano carte sconosciute (salvataggi
   assert.equal(E.knownCards(null), false); assert.equal(E.knownCards({status:'lobby'}), true, 'sala di attesa: nessuna carta');
   assert.equal(E.knownCards(E.newGame(['alba', 'tramonto'])), true, 'una partita nuova usa gli ID dei dati');
 });
+
+// ---------- mazzo casuale ----------
+test('mazzo casuale: "random" si trasforma in uno dei mazzi veri (con il generatore del motore, quindi ripetibile); gli altri id restano uguali', () => {
+  const ids = Object.keys(DECKS);
+  E.setRng(() => 0); assert.equal(E.randomDeck(), ids[0]);
+  E.setRng(() => 0.999999); assert.equal(E.randomDeck(), ids[ids.length - 1]);
+  assert.equal(E.resolveDeck('tramonto'), 'tramonto'); assert.equal(E.resolveDeck('mezzanotte'), 'mezzanotte');
+  assert.equal(E.RANDOM_DECK, 'random'); assert.ok(!(E.RANDOM_DECK in DECKS), '"random" non è un mazzo');
+  E.setRng(seeded(11)); const seen = new Set();
+  for(let i = 0; i < 400; i++){ const d = E.resolveDeck('random'); assert.ok(DECKS[d], d + ' è un mazzo vero'); seen.add(d); }
+  assert.equal(seen.size, ids.length, 'con abbastanza estrazioni escono tutti i mazzi');
+});
