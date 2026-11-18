@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const {read, loadGameData} = require('./helpers/net-env.js');
 
-const FILES = ['engine.js', 'net.js', 'graphics.js'];
+const FILES = ['engine.js', 'ai.js', 'net.js', 'graphics.js'];
 
 test('i file JavaScript hanno una sintassi valida', () => {
   for(const f of FILES) assert.doesNotThrow(() => new vm.Script(read(f), {filename: f}), f);
@@ -20,7 +20,7 @@ test('index.html carica PeerJS e poi loader.js; loader.js carica i dati e poi en
   assert.ok(!/<script>[\s\S]*?\S[\s\S]*?<\/script>/.test(html), 'nessuno script inline rimasto in index.html');
   assert.ok(html.includes('id="loadError"'), 'c\'è il posto per il messaggio se i dati non si caricano');
   const loader = read('loader.js');
-  const order = ['cards.json', 'decks.json', 'engine.js', 'net.js', 'graphics.js'].map(f => loader.indexOf("'" + f + "'"));
+  const order = ['cards.json', 'decks.json', 'engine.js', 'ai.js', 'net.js', 'graphics.js'].map(f => loader.indexOf("'" + f + "'"));
   assert.ok(order.every(i => i >= 0) && order.every((i, n) => n === 0 || i > order[n - 1]), 'ordine nel loader: ' + order.join(','));
 });
 test('cards.json e decks.json: struttura valida e coerente con le regole (frecce, Attributi, mazzi)', () => {
@@ -96,7 +96,7 @@ test('ogni Attributo ha la sua sfera in img/attributes/<NOME>.svg (file locali, 
 
 test('animazioni ridotte: la regola @media (prefers-reduced-motion) spegne davvero animazioni e transizioni (parentesi e selettori a posto)', () => {
   const css = read('style.css');
-  const m = css.match(/@media \(prefers-reduced-motion:reduce\)\{(.*)\}\s*$/m);
+  const m = [...css.matchAll(/@media \(prefers-reduced-motion:reduce\)\{(.*)\}\s*$/gm)].find(x => x[1].includes('.card.spin'));   // (ce ne sono altre, per esempio quella dell'interruttore)
   assert.ok(m, 'regola non trovata');
   const body = m[1];
   assert.match(body, /\.card\.spin[^{}]*\{animation:none\}/, 'le animazioni delle carte sono spente');
@@ -109,4 +109,26 @@ test('loader.js: gli script e i dati si caricano con ?v=VERSION, per non mescola
   assert.match(loader, /const VERSION = '[^']+'/, 'VERSION definita');
   assert.ok(/url \+ '\?v=' \+ VERSION/.test(loader) && /src \+ '\?v=' \+ VERSION/.test(loader), 'dati e script usano ?v=VERSION');
   assert.doesNotThrow(() => new vm.Script(loader, {filename: 'loader.js'}), 'sintassi valida');
+});
+
+test('schermata di caricamento: c’è in index.html (senza JavaScript non resta), ha lo stile e loader.js la nasconde a fine caricamento e in caso di errore', () => {
+  const html = read('index.html'), css = read('style.css'), loader = read('loader.js');
+  assert.match(html, /<div id="loading"[^>]*role="status"/); assert.match(html, /<noscript><style>#loading\{display:none\}<\/style><\/noscript>/);
+  assert.ok(html.indexOf('id="loading"') < html.indexOf('<div class="wrap">'), 'è il primo elemento, prima dell’interfaccia');
+  assert.match(css, /#loading\{position:fixed;inset:0;/); assert.match(css, /#loading\.done\{opacity:0/);
+  assert.equal((loader.match(/hideLoading\(\)/g) || []).length, 2, 'si nasconde a caricamento finito e in caso di errore');
+  assert.match(loader, /Promise\.race\(\[ready, new Promise\(r => setTimeout\(r, MAX_WAIT_MS\)\)\]\)/, 'con un tempo massimo, per non restare bloccata');
+});
+
+test('menu "Su questo dispositivo": ogni testo che cambia con la modalità ha le due varianti già nella pagina, sovrapposte, e il JavaScript non ne cambia il contenuto (niente si sposta)', () => {
+  const html = read('index.html'), css = read('style.css'), js = read('graphics.js');
+  const sec = html.slice(html.indexOf('id="localSection"'), html.indexOf('id="btnLocal"'));
+  const count = m => (sec.match(new RegExp(`data-m="${m}"`, 'g')) || []).length;
+  assert.ok(count('single') >= 4 && count('single') === count('multi'), `varianti: ${count('single')} singleplayer, ${count('multi')} multiplayer`);
+  assert.ok(!/\bhidden\b/.test(sec), 'niente attributo hidden nella sezione: lo spazio resta sempre occupato');
+  assert.match(css, /\.swap\{display:grid\}/); assert.match(css, /\.swap>\*\{grid-area:1\/1\}/);
+  assert.match(css, /#localSection\[data-mode="single"\] \.swap>\[data-m="multi"\][^{]*\{visibility:hidden\}/);
+  assert.match(css, /\.ms-lab\{[^}]*font-weight:600/, 'le etichette dell’interruttore hanno sempre lo stesso peso: cambia solo il colore');
+  assert.doesNotMatch(js, /localIntro|lblLd0|lblLd1|rowAiLevel|rowFace/, 'il JavaScript non cambia più i testi del menu');
+  assert.match(sec, /id="modeSwitch" role="switch"/); assert.ok(sec.indexOf('data-mode-set="single"') < sec.indexOf('data-mode-set="multi"'), 'Singleplayer è la prima scelta');
 });

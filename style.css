@@ -48,6 +48,26 @@ input[type=text]{text-transform:uppercase;letter-spacing:.15em;width:8.5em;font-
 .menu p{margin:0 0 14px;color:var(--muted);max-width:60ch}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
 .row label{min-width:7.5em}
+/* Menu "Su questo dispositivo": tutto ciò che cambia con la modalità sta in una cella .swap con le varianti sovrapposte (data-m): è visibile solo quella della modalità
+   attiva (data-mode sulla sezione), ma lo spazio occupato è sempre quello della variante più grande. Così riquadro, etichette e menu non si spostano al cambio. */
+.swap{display:grid}
+.swap>*{grid-area:1/1}
+#localSection[data-mode="single"] .swap>[data-m="multi"],#localSection[data-mode="multi"] .swap>[data-m="single"]{visibility:hidden}
+/* interruttore Singleplayer (a sinistra, spento) / Multiplayer (a destra, acceso); le etichette hanno sempre lo stesso peso: cambia solo il colore */
+.modeswitch{gap:12px}
+.ms-lab{background:none;border:0;padding:4px 2px;margin:0;font:inherit;font-weight:600;color:var(--muted);cursor:pointer}
+#localSection[data-mode="single"] [data-mode-set="single"],#localSection[data-mode="multi"] [data-mode-set="multi"]{color:var(--ink)}
+.row label.switch{position:relative;display:inline-block;width:48px;min-width:0;height:28px;flex:none}	/* (con .row label: altrimenti prende il min-width:7.5em delle etichette e diventa larghissimo) */
+.switch input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.switch .track{position:absolute;inset:0;border-radius:14px;background:var(--cellbg);border:1px solid var(--line);pointer-events:none;transition:background .15s}
+.switch .thumb{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--focus);transition:transform .15s}
+.switch input:checked + .track .thumb{transform:translateX(20px)}
+.switch input:focus-visible + .track{outline:3px solid var(--focus);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.switch .track,.switch .thumb{transition:none}}
+/* Nella sezione "Su questo dispositivo" etichette e menu a tendina (mazzi e difficoltà dell'IA) hanno la stessa colonna e la stessa larghezza, quindi sono allineati tra loro;
+   i menu si restringono se manca spazio (invece di andare a capo) e non superano 14em */
+#localSection .row>label[for]{flex:none;width:10.5em}
+#localSection .row>select{flex:1 1 7em;min-width:0;max-width:14em}
 .note{font-size:.92rem;color:var(--muted);margin-top:8px}
 .err{color:var(--danger);font-weight:600;margin-top:8px}
 .decklist{margin-top:16px;display:grid;gap:16px;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}	/* sempre due colonne (con più mazzi vanno a capo, non si aggiungono colonne); start: aprendo un mazzo l'altro resta alto quanto il suo titolo, non si stira */
@@ -216,6 +236,12 @@ input[type=text]{text-transform:uppercase;letter-spacing:.15em;width:8.5em;font-
 .overlay{padding:13px 15px;border:2px solid var(--pc);	/* bordo da 2px: padding ridotto di 1px per non alzare il riquadro */background:color-mix(in srgb,var(--pc) 10%,var(--surface))}
 .overlay .big{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:1.5rem}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}	/* solo per i lettori di schermo (annuncio delle nuove righe del registro) */
+/* Schermata di caricamento: parte visibile (il CSS è caricato prima del primo disegno), la nasconde loader.js quando script, dati, font e illustrazioni sono pronti */
+#loading{position:fixed;inset:0;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:var(--bg);color:var(--muted);font-family:'Chakra Petch',sans-serif;font-weight:600;transition:opacity .35s ease}
+#loading.done{opacity:0;pointer-events:none}
+#loading .spinner{width:34px;height:34px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--focus);animation:loadspin .9s linear infinite}
+@keyframes loadspin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){#loading{transition:none}#loading .spinner{animation:none;border-top-color:var(--line)}}
 [hidden]{display:none!important}
 
 @keyframes pulse{to{transform:rotate(var(--r,0deg)) scale(1.05)}}

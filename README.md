@@ -21,7 +21,10 @@ Il codice del simulatore è al 99% scritto dall'IA.
 - `node tools/balance.js [partite per coppia]`: ogni mazzo contro ogni altro con giocatori "avidi" (scelgono la mossa che massimizza subito le catture); mostra percentuali di vittoria, scarti, pareggi e l'effetto del primo giocatore.
 - `node tools/balance.js [partite] [mazzo] [--variant=file.json]`: con `--variant` si prova un mazzo modificato (file JSON con `cards` e/o `decks`) senza toccare i dati veri.
 - `node tools/card-impact.js <mazzo> [partite per avversario]`: quanto pesa ogni carta del mazzo (vittorie quando è giocata meno vittorie quando resta nel mazzo), contro tutti gli altri mazzi.
+- `node tools/ai-match.js <livello A> <livello B> [partite]`: partite tra due livelli dell'IA, con percentuale di vittorie e tempo per mossa.
 - `node tools/online-test.mjs [--full]`: prova online vera con tre Edge senza finestra (host, ospite, spettatore) tramite il server PeerJS: partita intera, caduta improvvisa dell'host e ricollegamento dello spettatore (`--full` aggiunge la chiusura della stanza). Serve internet.
 - `node tools/screenshot.mjs <home|game> <file.png> [larghezza] [auto|light|dark]`: screenshot della sezione mazzi o di una partita d'esempio.
 Gli ultimi due usano Edge (variabile d'ambiente `EDGE` se non è nel percorso predefinito di Windows) e avviano da soli un server locale.
+
+**Contro l'IA.** Nel menu "Su questo dispositivo" si sceglie tra *Multiplayer* (due giocatori sullo stesso schermo) e *Singleplayer*, dove l'IA gioca il Giocatore 2 (livello Facile: mosse casuali; Normale: sceglie la mossa che cattura di più subito; Difficile: guarda anche una mossa avanti, cioè la risposta migliore dell'avversario). Si sceglie con l'interruttore Singleplayer / Multiplayer. L'IA è in `ai.js`, pura come il motore (nessun DOM), e gli strumenti di `tools/` usano lo stesso codice.
 

@@ -212,7 +212,7 @@ function applyMove(st, seat, mv){
 // Come si chiama un giocatore nei messaggi. view = {online, seat}: in una partita online "tu" / "l’avversario" (cap = a inizio frase), altrimenti "Giocatore N".
 function whoName(s, cap, view){
   if(!view || !view.online) return pName(s);
-  return s===view.seat ? (cap ? 'Tu' : 'tu') : (cap ? 'L’avversario' : 'l’avversario');
+  return s===view.seat ? (cap ? 'Tu' : 'tu') : view.ai ? (cap ? 'L’IA' : 'l’IA') : (cap ? 'L’avversario' : 'l’avversario');	// (view.ai: l'avversario è l'IA)
 }
 // Traduce i segnaposto del registro (tp/tpa/tv) per chi guarda; i messaggi senza segnaposto (vecchie partite salvate) restano com'erano
 function formatLog(m, view){
@@ -220,7 +220,7 @@ function formatLog(m, view){
   return String(m).replace(/\{(pa|p|v)([01])(?::([^}|]*)\|([^}]*))?\}/g, (all, kind, n, third, second, off)=>{
     n = +n; const me = on && n===view.seat;
     if(kind==='v') return me ? second : third;
-    if(kind==='pa') return !on ? 'a ' + pName(n) : me ? 'a te' : 'all’avversario';
+    if(kind==='pa') return !on ? 'a ' + pName(n) : me ? 'a te' : view.ai ? 'all’IA' : 'all’avversario';
     const start = off===0 || /[.!?]\s$/.test(String(m).slice(0, off));
     return whoName(n, start, view);
   });

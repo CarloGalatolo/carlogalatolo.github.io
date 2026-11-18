@@ -31,6 +31,7 @@ let state = null;
 let localView = 0;
 let faceMode = false;
 let mySeat = null;
+let aiSeat = null, aiLevel = AI_DEFAULT_LEVEL, aiTimer = 0;	// partita contro l'IA (menu "Singleplayer"): aiSeat = il posto che gioca l'IA (null = partita normale a due)
 let selHand = null;
 let inspected = null;
 let animSeq = -1;
@@ -46,13 +47,15 @@ let present = null, presentTimer = 0, setupSeq = -1;
 function viewSeat(){ return mode===Mode.ONLINE ? (mySeat ?? 0) : localView; }
 function seatName(s){
   if(mode===Mode.ONLINE){ if(mySeat===null) return pName(s); return s===mySeat ? 'Tu' : 'Avversario'; }
+  if(isSolo()) return s===aiSeat ? 'IA' : 'Tu';
   return pName(s);
 }
 // Come si chiama un giocatore nei messaggi, dal punto di vista di chi guarda (le funzioni pure sono nel motore: whoName, formatLog)
-const viewOf = () => ({online: mode===Mode.ONLINE && mySeat!==null, seat: mySeat});
+const isSolo = () => mode===Mode.LOCAL && aiSeat!==null;	// partita contro l'IA: chi gioca è sempre l'altro posto
+const viewOf = () => isSolo() ? {online:true, seat:1-aiSeat, ai:true} : ({online: mode===Mode.ONLINE && mySeat!==null, seat: mySeat});
 function who(s, cap){ return whoName(s, cap, viewOf()); }
 function fmtMsg(m){ return formatLog(m, viewOf()); }
-function canAct(seat){ return !present && (mode===Mode.LOCAL || mySeat===seat); }
+function canAct(seat){ return !present && (mode===Mode.LOCAL ? (aiSeat===null || seat!==aiSeat) : mySeat===seat); }
 // Spettatore: in una stanza online senza un posto (guarda soltanto)
 const isSpectator = () => mode===Mode.ONLINE && online.spec;
 // Chi non è collegato, come lo sa l'host (e come lo dice agli spettatori)
@@ -260,6 +263,7 @@ function render(){
   $('log').innerHTML = (st.log||[]).slice(logHidden).map(l=>`<li>${esc(fmtMsg(l))}</li>`).join('');
   announceLog(st, logHidden);
   renderTools();
+  scheduleAi();
   saveRoom();
 }
 function renderHand(el, seat, isTop){
@@ -345,20 +349,22 @@ function renderStatus()
 			const what = p.stage==='col' ? 'la colonna' : 'la riga', whole = p.stage==='col' && p.row==null;
 			const fixed = p.stage==='col' ? (p.row!=null ? `La riga è ${p.row}. ` : '') : `La colonna è ${p.col}. `;
 			if(canAct(p.chooser)){
-				main = `${mode===Mode.LOCAL ? pName(p.chooser)+', scegli' : 'Scegli'} ${what}`;
+				main = `${mode===Mode.LOCAL && !isSolo() ? pName(p.chooser)+', scegli' : 'Scegli'} ${what}`;
 				sub = `${fixed}Scegli ${whole ? 'una colonna' : 'una casella'}.`;
 			} else { main = `In attesa che ${esc(who(p.chooser))} scelga ${what}`; sub = fixed.trim(); }
 		}
 	}
 	else if(st.status==='play'){
 		const me = canAct(st.turn);
-		if (st.pending) { main = me ? (mode===Mode.LOCAL ? `${pName(st.turn)}, scegli chi attaccare` : 'Scegli quale mostro attaccare') : `${seatName(st.turn)} sceglie chi attaccare`; sub = me ? 'Il tuo mostro punta più avversari: tocca quello che vuoi attaccare.' : ''; }
-		else if (me) { main = mode===Mode.LOCAL ? `Turno di ${pName(st.turn)}` : 'Tocca a te'; sub = selHand==null ? 'Scegli una carta dalla mano.' : 'Scegli uno spazio libero.'; }
+		if (st.pending) { main = me ? (mode===Mode.LOCAL && !isSolo() ? `${pName(st.turn)}, scegli chi attaccare` : 'Scegli quale mostro attaccare') : `${who(st.turn, true)} sceglie chi attaccare`; sub = me ? 'Il tuo mostro punta più avversari: tocca quello che vuoi attaccare.' : ''; }
+		else if (me) { main = mode===Mode.LOCAL && !isSolo() ? `Turno di ${pName(st.turn)}` : 'Tocca a te'; sub = selHand==null ? 'Scegli una carta dalla mano.' : 'Scegli uno spazio libero.'; }
 		else if (isSpectator()) { main = `Turno di ${pName(st.turn)}`; sub = !online.peersOnline ? 'Non sei collegato alla stanza.' : offlineNote(); }
+		else if (isSolo()) { main = 'Turno dell’IA'; sub = 'L’IA sta pensando…'; }
 		else { main = 'Turno dell’avversario'; sub = online.peersOnline ? '' : 'L’avversario non è connesso in questo momento.'; }
 	} else if(st.status==='over'){
 		const r = st.result; box.classList.add('overlay'); box.style.setProperty('--pc', `var(--p${r.winner})`);
-		const esito = mode===Mode.ONLINE && mySeat!==null ? (r.winner===mySeat ? 'Hai vinto' : 'Hai perso') : `Vince ${pName(r.winner)}`;
+		const mine = mode===Mode.ONLINE && mySeat!==null ? mySeat : isSolo() ? 1-aiSeat : null;	// il mio posto, se gioco io (online o contro l'IA)
+		const esito = mine!==null ? (r.winner===mine ? 'Hai vinto' : 'Hai perso') : `Vince ${pName(r.winner)}`;
 		main = `<span class="big">${esito}</span>`;
 		sub = `${r.score[0]} a ${r.score[1]}${r.tie ? ', pareggio risolto a favore di chi ha giocato per primo' : ''}.`;
 		// nuova partita: il pulsante sta nel box del risultato (in online lo vede solo chi è host, l'altro un avviso)
@@ -450,7 +456,7 @@ function announceLog(st, hidden){
 }
 function renderTools(){
   const st = state, el = $('tools'); let h = '';
-  if(mode===Mode.LOCAL && st.status!=='lobby') h += `<button class="btn" id="btnRotate">Gira il tavolo</button><button class="btn" id="btnFace" aria-pressed="${faceMode}">${faceMode?'Carte tutte nello stesso verso':'Carte verso chi le controlla'}</button>`;
+  if(mode===Mode.LOCAL && !isSolo() && st.status!=='lobby') h += `<button class="btn" id="btnRotate">Gira il tavolo</button><button class="btn" id="btnFace" aria-pressed="${faceMode}">${faceMode?'Carte tutte nello stesso verso':'Carte verso chi le controlla'}</button>`;
   if(mode===Mode.ONLINE && !online.host && !online.peersOnline) h += `<button class="btn primary" id="btnReconnect">Riconnetti</button>`;
   if(mode===Mode.ONLINE && online.host && online.signal===false) h += `<button class="btn primary" id="btnResignal">Ricollega la stanza</button>`;
   if(mode===Mode.ONLINE && st.status!=='lobby' && specCount()) h += `<span class="note">Spettatori: ${specCount()}</span>`;
@@ -471,6 +477,7 @@ document.addEventListener('click', e=>{
   if(t.id==='btnResignal'){ if(online.peer) hostKeepSignal(online.peer); return; }
   if(t.id==='btnRotate'){ if(isBusy()) return; localView = 1-localView; saveLocal(); return render(); }
   if(t.id==='btnFace'){ if(isBusy()) return; faceMode = !faceMode; prefSet('face', faceMode); saveLocal(); return render(); }
+  if(t.dataset.modeSet!=null){ $('modeSwitch').checked = t.dataset.modeSet==='multi'; prefSet('localMode', t.dataset.modeSet); return syncLocalMenu(); }	// clic sul nome di una modalità accanto all'interruttore
   if(t.id==='btnTheme') return cycleTheme();
   if(t.id==='btnResumeLocal') return resumeLocal();
   if(t.id==='btnForgetLocal') return forgetLocal();
@@ -507,6 +514,7 @@ document.addEventListener('mouseover', e=>setPreview(previewOf(e.target)));
 document.addEventListener('focusin', e=>setPreview(previewOf(e.target)));
 document.addEventListener('change', e=>{
   const t = e.target;
+  if(t.id==='modeSwitch'){ prefSet('localMode', isSingleMode() ? 'single' : 'multi'); syncLocalMenu(); return; }
   if(t.dataset && t.dataset.deckSeat!=null && state && state.status==='lobby'){
     const s = +t.dataset.deckSeat; if(s!==mySeat) return;
     const deck = t.value; const seq = (state.seq||0)+1;
@@ -530,7 +538,7 @@ function saveLocal(){	// a ogni mossa (e a ogni cambio di vista); a partita fini
   if(mode!==Mode.LOCAL || !state) return;
   if(state.status!=='play' && state.status!=='setup'){ forgetLocal(true); return; }
   const copy = Object.assign({}, state); copy.fx = null; copy.sfx = null;	// (le animazioni non si rifanno al ritorno)
-  storeSaved(LOCAL_KEY, {state:copy, view:localView, face:faceMode});
+  storeSaved(LOCAL_KEY, {state:copy, view:localView, face:faceMode, ai: aiSeat===null ? null : {seat:aiSeat, level:aiLevel}});
 }
 function forgetLocal(quiet){ try{ localStorage.removeItem(LOCAL_KEY); }catch{} if(!quiet) showLocalResume(); }
 function showLocalResume(){
@@ -538,21 +546,48 @@ function showLocalResume(){
   if(!r || !r.state || !knownCards(r.state) || (r.state.status!=='play' && r.state.status!=='setup')){ box.hidden = true; box.innerHTML = ''; return; }
   const st = r.state, free = st.board ? st.board.filter(x=>x===null).length : 0;
   box.hidden = false;
-  box.innerHTML = `<div>Hai lasciato una partita a metà (${st.status==='setup' ? 'preparazione del campo' : `turno di ${esc(pName(st.turn))}, ${free} spazi liberi`}).</div>`+
+  const turn = r.ai ? (st.turn===r.ai.seat ? 'turno dell’IA' : 'tocca a te') : `turno di ${pName(st.turn)}`;
+  box.innerHTML = `<div>Hai lasciato una partita${r.ai ? ' contro l’IA' : ''} a metà (${st.status==='setup' ? 'preparazione del campo' : `${esc(turn)}, ${free} spazi liberi`}).</div>`+
     `<div class="row"><button class="btn primary" id="btnResumeLocal">Riprendi la partita</button><button class="btn" id="btnForgetLocal">Dimentica</button></div>`;
 }
 function resumeLocal(){
   const r = loadSaved(LOCAL_KEY); if(!r || !r.state || !knownCards(r.state)){ showLocalResume(); return; }
-  mode = Mode.LOCAL; mySeat = null; localView = r.view===1 ? 1 : 0; faceMode = !!r.face; selHand = null; inspected = null; flash = ''; logSpoken = null;
+  mode = Mode.LOCAL; mySeat = null; localView = r.view===1 ? 1 : 0; selHand = null; inspected = null; flash = ''; logSpoken = null;
+  aiSeat = r.ai && (r.ai.seat===0 || r.ai.seat===1) ? r.ai.seat : null; aiLevel = r.ai && AI_LEVELS[r.ai.level] ? r.ai.level : AI_DEFAULT_LEVEL;
+  faceMode = aiSeat===null && !!r.face;
   state = Object.assign({}, r.state, {fx:null, sfx:null});
   showGame(); render();
 }
 applyTheme(prefGet('theme', 'auto')); $('faceOpt').checked = !!prefGet('face', false);
+// Menu "Su questo dispositivo": Multiplayer (due giocatori sullo stesso schermo) o Singleplayer (contro l'IA, che gioca il Giocatore 2)
+$('aiLevel').innerHTML = Object.entries(AI_LEVELS).map(([k, n]) => `<option value="${k}">${n}</option>`).join('');
+$('aiLevel').value = AI_LEVELS[prefGet('aiLevel', AI_DEFAULT_LEVEL)] ? prefGet('aiLevel', AI_DEFAULT_LEVEL) : AI_DEFAULT_LEVEL;
+// L'interruttore (#modeSwitch): spento = Singleplayer (la prima scelta), acceso = Multiplayer. La sezione ha data-mode; i testi delle due modalità sono già nella pagina,
+// sovrapposti, e il CSS mostra quelli giusti (vedi .swap in style.css): niente testi che cambiano, quindi niente che si sposta.
+const isSingleMode = () => !$('modeSwitch').checked;
+function syncLocalMenu(){ $('localSection').dataset.mode = isSingleMode() ? 'single' : 'multi'; }
+$('modeSwitch').checked = prefGet('localMode', 'single') === 'multi';
+syncLocalMenu();
+// L'IA gioca quando tocca a lei e l'interfaccia è ferma (dadi e animazioni finiti): render() la richiama a ogni disegno
+const AI_DELAY_MS = 700;
+function scheduleAi(){
+  clearTimeout(aiTimer);
+  if(!isSolo() || !state || isBusy() || state.status==='lobby' || state.status==='over' || actingSeat(state)!==aiSeat) return;
+  const seq = state.seq;
+  aiTimer = setTimeout(() => {
+    if(!isSolo() || !state || state.seq!==seq || isBusy() || actingSeat(state)!==aiSeat) return;
+    const mv = aiChoose(state, aiLevel);
+    if(mv) act(mv);
+  }, AI_DELAY_MS);
+}
 
 // ---------- local ----------
 function startLocal(){
   mode = Mode.LOCAL; mySeat = null; localView = 0; selHand = null; inspected = null; flash='';
-  faceMode = $('faceOpt').checked; prefSet('face', faceMode);
+  const single = isSingleMode();
+  aiSeat = single ? 1 : null; aiLevel = AI_LEVELS[$('aiLevel').value] ? $('aiLevel').value : AI_DEFAULT_LEVEL;
+  prefSet('localMode', single ? 'single' : 'multi'); prefSet('aiLevel', aiLevel);
+  faceMode = !single && $('faceOpt').checked; if(!single) prefSet('face', faceMode);
   state = {seq:0, status:'lobby', players:{s0:{deck:resolveDeck($('ld0').value)}, s1:{deck:resolveDeck($('ld1').value)}}};
   showGame(); startMatch();
 }
@@ -576,7 +611,7 @@ function exitToMenu(){
   leaveRoom();
   destroyPeer(online.conn || online.specs.size ? 250 : 0);	// (con un ritardo, i saluti a giocatore e spettatori fanno in tempo a partire)
   cancelPresent(); cancelFx(); setupSeq = -1; animSeq = -1;	// la prossima partita riparte da seq basso: le animazioni non vanno considerate già viste
-  mode = null; state = null; mySeat = null; selHand = null; lastStatus = null; logSpoken = null;
+  mode = null; state = null; mySeat = null; selHand = null; lastStatus = null; logSpoken = null; aiSeat = null; clearTimeout(aiTimer);
   $('menu').hidden = false; $('game').hidden = true; $('btnExit').hidden = true; showResume(); showLocalResume();
   requestAnimationFrame(() => window.scrollTo({top:0, behavior: scrollMode()}));	// tornando alla home si scorre fino in cima
   try{ history.replaceState(null, '', location.pathname + location.search); }catch{}
@@ -639,15 +674,23 @@ function attrDiagram() {
 // Regole di preparazione
 $('rulesSetup').innerHTML = `<details open>
 	<summary>Preparazione</summary>
+	<p><b>Link Grid</b> è una variante di Yu-Gi-Oh per due giocatori interamente giocabile al tavolo. Questo simulatore riprende fedelmente le meccaniche.</p>
+	<p>Per giocare, sono necessari:</p>
+	<ul>
+		<li><b>Due mazzi di 15 mostri Link</b> (sono equilibrati se hanno lo stesso totale di valori Link);</li>
+		<li><b>Una griglia di 5×5 spazi</b> (va bene un tappetino da gioco aggiornato, considerando anche gli spazi vuoti tra le zone mostro);</li>
+		<li><b>Due dadi</b> a sei facce.</li>
+	</ul>
+	<p>Per prima cosa si svolge la preparazione del campo:</p>
 	<ol>
 		<li><b>Chi inizia.</b> Determinate casualmente il primo giocatore (per esempio tirando i dadi).</li>
-		<li><b>Campo.</b> Si gioca in una griglia di 5×5 spazi. Il primo giocatore numera le colonne da 1 a 5 partendo dalla sua sinistra; il secondo numera le righe da 1 a 5 partendo dalla più vicina a sé.</li>
+		<li><b>Campo.</b> Il primo giocatore numera le colonne da 1 a 5 partendo dalla sua sinistra; il secondo numera le righe da 1 a 5 partendo dalla più vicina a sé.</li>
 		<li><b>Spazi bloccati.</b> Tirate un dado ciascuno: il dado del primo giocatore indica la colonna, quello del secondo la riga; lo spazio all’incrocio viene bloccato e non vi si potrà giocare carte. <b>Ripetere fino a bloccare 5 spazi.</b></li>
 		<li><b>Singolo 6.</b> Chi fa 6 al dado sceglie il numero, da 1 a 5, tra gli spazi ancora liberi: la colonna se è il primo giocatore, la riga se è il secondo.</li>
 		<li><b>Doppio 6.</b> Se entrambi fate 6 al dado, il primo giocatore sceglie la colonna, poi il secondo sceglie la riga.</li>
-		<li><b>Prima mano.</b> Mescolate i mazzi e pescate 5 carte. Quando rimanete senza carte in mano, pescate altre 5 carte all'inizio del vostro turno.</li>
+		<li><b>Prima mano.</b> Mescolate i mazzi e pescate 5 carte.</li>
 	</ol>
-	<p class="note">Nel simulatore, la preparazione è gestita automaticamente.</p>
+	Terminata la preparazione, si gioca a turno a partire dal primo giocatore.
 </details>`;
 
 // Regole di gioco. Mostrato nel menu principale e in partita.
@@ -658,6 +701,7 @@ const RULES_HTML =
 		<li>Piazza un mostro in uno spazio libero. Se una sua freccia punta un mostro avversario, <b>deve attaccarlo</b>; se ne punta più di uno, scegline <b>uno solo</b>.</li>
 		<li>Se il difensore non ha la freccia opposta, è <b>catturato</b>. Altrimenti si confrontano gli ATK: chi ne ha meno viene catturato, con il pareggio non succede nulla.</li>
 		<li>Il mostro catturato ruota verso di te e, se ora punta altri mostri avversari, attacca a sua volta (combo). Se il tuo attaccante perde, viene catturato dall’avversario e il turno finisce.</li>
+		<li>Quando rimani senza carte in mano, pesca altre 5 carte all'inizio del tuo prossimo turno.</li>
 	</ul>
 	Quando non restano più spazi liberi, la partita termina: <b><u>vince chi controlla più mostri</u></b> (in caso di parità <b>vince il primo giocatore</b>).
 	<p class="note">Gli effetti dei mostri sono ignorati.</p>
@@ -666,9 +710,10 @@ const RULES_HTML =
 	<p class="note">La freccia va dall’Attributo che ha il vantaggio a quello che lo subisce.</p>
 </details>`;
 
-$('rulesGame').innerHTML = RULES_HTML;	// Riquadro delle regole nella schermata di gioco.
 $('rulesMenu').innerHTML = RULES_HTML;	// Riquadro delle regole nella scchermata principale.
+$('rulesGame').innerHTML = RULES_HTML;	// Riquadro delle regole nella schermata di gioco.
 $('rulesMenu').querySelector('details').open = true;	// nella home le regole partono aperte (in partita restano chiuse)
+$('rulesGame').querySelector('details').open = true;	// nella home le regole partono aperte (in partita restano chiuse)
 const hm =/^#stanza-([A-Za-z0-9]{5})$/.exec(location.hash);
 if(hm) $('joinCode').value = hm[1].toUpperCase();
 initOnline();

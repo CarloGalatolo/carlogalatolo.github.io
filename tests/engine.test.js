@@ -472,3 +472,10 @@ test('mazzo casuale: "random" si trasforma in uno dei mazzi veri (con il generat
   for(let i = 0; i < 400; i++){ const d = E.resolveDeck('random'); assert.ok(DECKS[d], d + ' è un mazzo vero'); seen.add(d); }
   assert.equal(seen.size, ids.length, 'con abbastanza estrazioni escono tutti i mazzi');
 });
+
+test('nomi nel registro: se l’avversario è l’IA si legge "l’IA" / "all’IA" invece di "l’avversario"', () => {
+  const view = {online: true, seat: 0, ai: true}, viewNoAi = {online: true, seat: 0};
+  assert.equal(E.whoName(1, true, view), 'L’IA'); assert.equal(E.whoName(1, false, view), 'l’IA'); assert.equal(E.whoName(0, true, view), 'Tu');
+  assert.equal(E.whoName(1, true, viewNoAi), 'L’avversario');
+  assert.equal(E.formatLog(E.tpa(1), view), 'all’IA'); assert.equal(E.formatLog(E.tpa(1), viewNoAi), 'all’avversario'); assert.equal(E.formatLog(E.tpa(0), view), 'a te');
+});

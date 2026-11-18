@@ -26,10 +26,11 @@ class FakeEl {
 
 function createUiEnv(){
   const els = {};
-  const rafQueue = [];
+  const listeners = {};   // gestori registrati con document.addEventListener (graphics.js): env.click li esegue
+  const rafQueue = [], timers = [];   // i timer non partono da soli: i test li lanciano con env.fire(ms)
   const document = {
     getElementById: id => els[id] || (els[id] = new FakeEl(id)),
-    querySelector: () => new FakeEl('q'), querySelectorAll: () => [], addEventListener(){}, documentElement: new FakeEl('html'), hidden: false,
+    querySelector: () => new FakeEl('q'), querySelectorAll: () => [], addEventListener: (type, f) => { (listeners[type] = listeners[type] || []).push(f); }, documentElement: new FakeEl('html'), hidden: false,
     fonts: {ready: Promise.resolve()}
   };
   const store = {};
@@ -40,14 +41,18 @@ function createUiEnv(){
     location: {hash: '', pathname: '/', search: ''}, history: {replaceState(){}},
     localStorage: {getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; }},
     sessionStorage: {getItem: () => null, setItem(){}},
-    setTimeout: () => 0, clearTimeout(){}, setInterval: () => 0, clearInterval(){},
+    setTimeout: (f, ms) => { timers.push({f, ms, off: false}); return timers.length; }, clearTimeout: n => { if(timers[n - 1]) timers[n - 1].off = true; }, setInterval: () => 0, clearInterval(){},
     performance: {now: () => Date.now()},
     requestAnimationFrame: f => { rafQueue.push(f); return rafQueue.length; }
   });
   // (niente Peer: initOnline mostra il messaggio "libreria non caricata", che qui non interessa)
   loadGameData(ctx);
-  for(const f of ['engine.js', 'net.js', 'graphics.js']) vm.runInContext(read(f), ctx, {filename: f});
-  const env = {ctx, els, el: id => document.getElementById(id), flushRaf(){ while(rafQueue.length) rafQueue.shift()(); }};
+  for(const f of ['engine.js', 'ai.js', 'net.js', 'graphics.js']) vm.runInContext(read(f), ctx, {filename: f});
+  const env = {ctx, els, el: id => document.getElementById(id), flushRaf(){ while(rafQueue.length) rafQueue.shift()(); },
+    // esegue (una volta) l'ultimo timer non annullato con quell'attesa in ms; false se non c'è
+    // simula il clic su un pulsante (un oggetto con id e dataset, come quelli che graphics.js legge)
+    click(target){ const e = {target: Object.assign({closest(){ return this; }}, target)}; (listeners.click || []).forEach(f => f(e)); },
+    fire(ms){ const t = timers.filter(x => !x.off && x.ms === ms).pop(); if(!t) return false; t.off = true; t.f(); return true; }};
   env.run = code => vm.runInContext(code, ctx);   // valuta nel contesto (per let/const di graphics.js: state, mode, selHand…)
 
   // Stato di una partita in corso tra due giocatori (costruito dal motore): turno di `turn`, campo con 5 spazi bloccati

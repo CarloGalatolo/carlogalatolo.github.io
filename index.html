@@ -14,38 +14,52 @@
 <link rel="stylesheet" href="style.css">
 
 <body>
+<div id="loading" role="status" aria-live="polite"><div class="spinner" aria-hidden="true"></div><div>Caricamento…</div></div>
+<noscript><style>#loading{display:none}</style></noscript>
 
 <div class="wrap">
-  <header class="top">
-    <h1>YGO Link Grid</h1>
-    <span class="spacer"></span>
-    <button class="btn" id="btnTheme" aria-label="Cambia tema"></button>
-    <button class="btn" id="btnExit" hidden>Torna al menu</button>
-  </header>
+	<header class="top">
+		<h1>YGO Link Grid</h1>
+		<span class="spacer"></span>
+		<button class="btn" id="btnTheme" aria-label="Cambia tema"></button>
+		<button class="btn" id="btnExit" hidden>Torna al menu</button>
+	</header>
 
-  <p class="err" id="loadError" hidden></p>
+	<p class="err" id="loadError" hidden></p>
 
-  <main id="menu">
-    <div class="menu">
-		<section>
-			<h2>Su questo dispositivo</h2>
-			<p>Due giocatori a turno sullo stesso schermo.</p>
-			<div class="row"><label for="ld0">Mazzo del Giocatore 1</label><select id="ld0"></select></div>
-			<div class="row"><label for="ld1">Mazzo del Giocatore 2</label><select id="ld1"></select></div>
-			<div class="row"><label style="min-width:0"><input type="checkbox" id="faceOpt"> Carte rivolte verso chi le controlla</label></div>
-			<button class="btn primary" id="btnLocal">Inizia la partita</button>
-			<div class="note resume" id="localResume" hidden></div>
-		</section>
-		<section>
-			<h2>Online, in una stanza</h2>
-			<p>Crea una stanza e dai il codice all’altro giocatore, oppure entra con il suo codice. Tenete entrambi questa pagina aperta.</p>
-			<div class="row"><label for="od">Il tuo mazzo</label><select id="od"></select></div>
-			<div class="row"><button class="btn primary" id="btnCreate" disabled>Crea una stanza</button><input type="text" id="joinCode" maxlength="5" placeholder="CODICE" aria-label="Codice della stanza" autocomplete="off"><button class="btn" id="btnJoin" disabled>Entra</button></div>
-			<div class="row"><label style="min-width:0"><input type="checkbox" id="specOpt"> Entra come spettatore (se la stanza è già piena lo diventi comunque)</label></div>
-			<div class="note" id="onlineNote">Controllo della connessione…</div>
-			<div class="err" id="menuErr" hidden></div>
-			<div class="note resume" id="resumeBox" hidden></div>
-		</section>
+	<main id="menu">
+		<div class="menu">
+			<section id="localSection" data-mode="single">
+				<h2>Su questo dispositivo</h2>
+				<!-- Le parti che cambiano con la modalità (data-m) stanno una sopra l'altra nella stessa cella (.swap): ne è visibile una sola, ma lo spazio è quello della più grande, quindi niente si sposta -->
+				<div class="swap">
+					<p data-m="single">Una partita contro l’intelligenza artificiale.</p>
+					<p data-m="multi">Due giocatori a turno sullo stesso schermo.</p>
+				</div>
+				<div class="row modeswitch" role="group" aria-label="Modalità di gioco">
+					<button type="button" class="ms-lab" data-mode-set="single">Singleplayer</button>
+					<label class="switch"><input type="checkbox" id="modeSwitch" role="switch" aria-label="Multiplayer (spento: Singleplayer)"><span class="track"><span class="thumb"></span></span></label>
+					<button type="button" class="ms-lab" data-mode-set="multi">Multiplayer</button>
+				</div>
+				<div class="row"><label for="ld0" class="swap"><span data-m="single">Il tuo mazzo</span><span data-m="multi">Mazzo del Giocatore 1</span></label><select id="ld0"></select></div>
+				<div class="row"><label for="ld1" class="swap"><span data-m="single">Mazzo dell’IA</span><span data-m="multi">Mazzo del Giocatore 2</span></label><select id="ld1"></select></div>
+				<div class="swap">
+					<div class="row" data-m="single"><label for="aiLevel">Difficoltà dell’IA</label><select id="aiLevel"></select></div>
+					<div class="row" data-m="multi"><label style="min-width:0"><input type="checkbox" id="faceOpt"> Carte rivolte verso chi le controlla</label></div>
+				</div>
+				<button class="btn primary" id="btnLocal">Inizia la partita</button>
+				<div class="note resume" id="localResume" hidden></div>
+			</section>
+			<section>
+				<h2>Online, in una stanza</h2>
+				<p>Crea una stanza e dai il codice all’altro giocatore, oppure entra con il suo codice. Tenete entrambi questa pagina aperta.</p>
+				<div class="row"><label for="od">Il tuo mazzo</label><select id="od"></select></div>
+				<div class="row"><button class="btn primary" id="btnCreate" disabled>Crea una stanza</button><input type="text" id="joinCode" maxlength="5" placeholder="CODICE" aria-label="Codice della stanza" autocomplete="off"><button class="btn" id="btnJoin" disabled>Entra</button></div>
+				<div class="row"><label style="min-width:0"><input type="checkbox" id="specOpt"> Entra come spettatore (se la stanza è già piena lo diventi comunque)</label></div>
+				<div class="note" id="onlineNote">Controllo della connessione…</div>
+				<div class="err" id="menuErr" hidden></div>
+				<div class="note resume" id="resumeBox" hidden></div>
+			</section>
 		</div>
 		<div class="rulesrow">
 			<div class="box rules" id="rulesSetup"></div>
@@ -54,25 +68,25 @@
 		<div class="decklist" id="deckPreview"></div>
 	</main>
 
-  <main id="game" class="game" hidden>
-    <div class="box" id="statusBox" aria-live="polite"><div class="status" id="status"></div></div>
-    <section class="table" aria-label="Tavolo">
-      <div class="pinfo" id="infoTop"></div>
-      <div class="hand topside" id="handTop"></div>
-      <div class="board" id="board" role="grid" aria-label="Griglia 5 per 5"></div>
-      <div class="hand bottom" id="handBottom"></div>
-      <div class="pinfo" id="infoBottom"></div>
-    </section>
-    <aside class="panel">
-      <div class="box" id="extraBox" hidden></div>
-      <div class="box" id="inspBox"><h3>Carta selezionata</h3><div id="insp" class="insp-stack"></div></div>
-      <div class="tools" id="tools"></div>
-      <div class="box rules" id="rulesGame"></div>
-      <div class="box"><h3>Registro</h3><ol class="log" id="log"></ol><div id="logLive" class="sr-only" aria-live="polite" aria-atomic="true"></div></div>
-    </aside>
-  </main>
-  
+	<main id="game" class="game" hidden>
+		<div class="box" id="statusBox" aria-live="polite"><div class="status" id="status"></div></div>
+		<section class="table" aria-label="Tavolo">
+			<div class="pinfo" id="infoTop"></div>
+			<div class="hand topside" id="handTop"></div>
+			<div class="board" id="board" role="grid" aria-label="Griglia 5 per 5"></div>
+			<div class="hand bottom" id="handBottom"></div>
+			<div class="pinfo" id="infoBottom"></div>
+		</section>
+		<aside class="panel">
+			<div class="box" id="extraBox" hidden></div>
+			<div class="box" id="inspBox"><h3>Carta selezionata</h3><div id="insp" class="insp-stack"></div></div>
+			<div class="tools" id="tools"></div>
+			<div class="box"><h3>Registro</h3><ol class="log" id="log"></ol><div id="logLive" class="sr-only" aria-live="polite" aria-atomic="true"></div></div>
+			<div class="box rules" id="rulesGame"></div>
+		</aside>
+	</main>
 </div>
+
 <script src="loader.js"></script>
 </body>
 </html>

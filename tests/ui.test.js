@@ -276,3 +276,90 @@ test('mazzo casuale: scegliendola in una partita locale, il mazzo si sorteggia a
   const decks = JSON.parse(env.run('JSON.stringify([state.players.s0.deck, state.players.s1.deck])'));
   for(const d of decks) assert.ok(['alba', 'tramonto', 'mezzogiorno', 'mezzanotte'].includes(d), d + ' è un mazzo vero');
 });
+
+test('menu "Su questo dispositivo": interruttore Singleplayer (prima scelta, spento) / Multiplayer, e il livello Difficile tra le difficoltà', () => {
+  const env = createUiEnv();
+  assert.equal(env.el('modeSwitch').checked, false, 'di partenza: Singleplayer');
+  assert.equal(env.el('localSection').dataset.mode, 'single');
+  assert.deepEqual([...env.el('aiLevel').innerHTML.matchAll(/value="([^"]+)"/g)].map(m => m[1]), ['facile', 'normale', 'difficile']);
+  assert.match(env.el('aiLevel').innerHTML, />Difficile</);
+  env.el('modeSwitch').checked = true; env.run('syncLocalMenu()');
+  assert.equal(env.el('localSection').dataset.mode, 'multi');
+  env.el('modeSwitch').checked = false; env.run('syncLocalMenu()');
+  assert.equal(env.el('localSection').dataset.mode, 'single');
+});
+
+test('menu: cliccando il nome di una modalità accanto all’interruttore si sceglie quella modalità, e la scelta si ricorda', () => {
+  const env = createUiEnv();
+  env.click({id: '', dataset: {modeSet: 'multi'}});
+  assert.equal(env.el('modeSwitch').checked, true); assert.equal(env.el('localSection').dataset.mode, 'multi'); assert.equal(env.run(`prefGet('localMode', 'single')`), 'multi');
+  env.click({id: '', dataset: {modeSet: 'single'}});
+  assert.equal(env.el('modeSwitch').checked, false); assert.equal(env.el('localSection').dataset.mode, 'single'); assert.equal(env.run(`prefGet('localMode', 'single')`), 'single');
+  env.run(`prefSet('localMode', 'multi')`);
+  const env2 = createUiEnv(); env2.run(`prefSet('localMode', 'multi')`);   // (un browser nuovo parte da Singleplayer: la preferenza è per ambiente)
+  assert.equal(env2.el('modeSwitch').checked, false);
+});
+
+test('singleplayer: la partita parte con l’IA al posto 2, la scelta si ricorda e le opzioni da due giocatori spariscono', () => {
+  const env = createUiEnv();
+  env.el('modeSwitch').checked = false; env.el('aiLevel').value = 'difficile'; env.el('faceOpt').checked = true;
+  env.el('ld0').value = 'alba'; env.el('ld1').value = 'random';
+  env.run('startLocal()');
+  assert.equal(env.run('aiSeat'), 1); assert.equal(env.run('aiLevel'), 'difficile'); assert.equal(env.run('isSolo()'), true);
+  assert.equal(env.run('faceMode'), false, 'contro l’IA non ha senso girare le carte');
+  assert.equal(env.run(`prefGet('localMode', 'multi')`), 'single'); assert.equal(env.run(`prefGet('aiLevel', 'normale')`), 'difficile');
+  assert.doesNotMatch(env.el('tools').innerHTML, /btnRotate|btnFace/, 'niente "Gira il tavolo" né carte verso chi le controlla');
+  env.run('exitToMenu()'); assert.equal(env.run('aiSeat'), null);
+  env.el('modeSwitch').checked = true; env.run('startLocal()');
+  assert.equal(env.run('aiSeat'), null, 'multiplayer: nessuna IA'); assert.equal(env.run('isSolo()'), false);
+});
+
+test('singleplayer: tocca a te -> "Tocca a te"; tocca all’IA -> "Turno dell’IA", e il turno non è tuo', () => {
+  const env = createUiEnv();
+  env.run('mode = "local"; aiSeat = 1;');
+  env.show({state: env.playState(0), mode:'local'});
+  assert.match(env.el('status').text, /Tocca a te/); assert.equal(env.run('canAct(0)'), true); assert.equal(env.run('canAct(1)'), false, 'i posti dell’IA non si usano a mano');
+  env.show({state: env.playState(1), mode:'local'});
+  assert.match(env.el('status').text, /Turno dell’IA/); assert.match(env.el('status').text, /sta pensando/);
+  assert.ok(!env.el('handBottom')._cls.has('pick'), 'nessun bordo di scelta durante il turno dell’IA');
+  assert.equal(env.run('seatName(0)'), 'Tu'); assert.equal(env.run('seatName(1)'), 'IA');
+});
+
+test('singleplayer: quando tocca all’IA e l’interfaccia è ferma, gioca da sola una mossa valida dopo una breve pausa', () => {
+  const env = createUiEnv();
+  env.run('mode = "local"; aiSeat = 1; aiLevel = "normale";');
+  const st = env.playState(1); const before = st.hands[1].length;
+  env.show({state: st, mode:'local'});
+  assert.equal(env.run('state.hands[1].length'), before, 'non ha ancora giocato: prima c’è la pausa');
+  assert.ok(env.fire(700), 'è in programma la mossa dell’IA');
+  assert.equal(env.run('state.hands[1].length'), before - 1, 'ha piazzato una carta');
+  assert.ok(env.run('state.seq') > 10, 'lo stato è avanzato');
+});
+
+test('singleplayer: l’IA non gioca nel turno dell’utente e aspetta se c’è un’animazione in corso', () => {
+  const env = createUiEnv();
+  env.run('mode = "local"; aiSeat = 1;');
+  env.show({state: env.playState(0), mode:'local'});   // tocca all'utente
+  assert.equal(env.fire(700), false, 'nessuna mossa programmata nel turno dell’utente');
+  env.run('fxSeq = 10; fxView = {sel:false}'); env.show({state: env.playState(1), mode:'local'});   // tocca all'IA, ma c'è un'animazione in corso
+  assert.equal(env.fire(700), false, 'animazione in corso: aspetta'); env.run('fxView = null');
+});
+
+test('singleplayer: a fine partita "Hai vinto" / "Hai perso" e il pulsante per rigiocare', () => {
+  const env = createUiEnv();
+  env.run('mode = "local"; aiSeat = 1;');
+  const st = env.playState(0); st.status = 'over'; st.result = {winner:0, score:[11, 9], tie:false};
+  env.show({state: st, mode:'local'});
+  assert.match(env.el('status').text, /Hai vinto/); assert.match(env.el('status').innerHTML, /btnAgain/);
+  st.result = {winner:1, score:[9, 11], tie:false}; env.show({state: st, mode:'local'}); assert.match(env.el('status').text, /Hai perso/);
+});
+
+test('singleplayer: il salvataggio ricorda l’IA e la ripresa la rimette (con il testo "contro l’IA")', () => {
+  const env = createUiEnv();
+  env.run('mode = "local"; aiSeat = 1; aiLevel = "facile";');
+  env.show({state: env.playState(0), mode:'local'}); env.run('saveLocal()');
+  const saved = JSON.parse(JSON.stringify(env.run('loadSaved(LOCAL_KEY)')));
+  assert.deepEqual(saved.ai, {seat:1, level:'facile'});
+  env.run('exitToMenu()'); assert.match(env.el('localResume').text, /contro l’IA/); assert.match(env.el('localResume').text, /tocca a te/);
+  env.run('resumeLocal()'); assert.equal(env.run('aiSeat'), 1); assert.equal(env.run('aiLevel'), 'facile'); assert.equal(env.run('faceMode'), false);
+});
